@@ -1,6 +1,10 @@
-#!/usr/bin/env python
+'''
+provide libsodium support for openssl < 1.1.0
 
-# Copyright (c) 2017-2018 v3aqb
+not needed on windows
+'''
+
+# Copyright (c) 2017-2019 v3aqb
 
 # This file is part of hxcrypto.
 
@@ -42,56 +46,44 @@
 from __future__ import absolute_import, division, print_function, \
     with_statement
 
-import os
 import logging
 from ctypes import CDLL, c_char_p, c_int, c_ulonglong, c_uint, byref, \
     create_string_buffer, c_void_p
 
 from cryptography.exceptions import InvalidTag
 
-logger = logging.getLogger('ctypes_libsodium')
-logger.setLevel(logging.INFO)
-hdr = logging.StreamHandler()
-formatter = logging.Formatter('%(asctime)s %(name)s:%(levelname)s %(message)s',
-                              datefmt='%H:%M:%S')
-hdr.setFormatter(formatter)
-logger.addHandler(hdr)
-
-libsodium = None
-loaded = False
-
-buf_size = 1024 * 16
+LIBSODIUM = None
+LOADED = False
 
 # for salsa20 and chacha20
 BLOCK_SIZE = 64
 
 
-def find_library_nt(name):
-    # modified from ctypes.util
-    # ctypes.util.find_library just returns first result he found
-    # but we want to try them all
-    # because on Windows, users may have both 32bit and 64bit version installed
-    import glob
-    results = []
-    for directory in os.environ['PATH'].split(os.pathsep):
-        fname = os.path.join(directory, name)
-        if os.path.isfile(fname):
-            results.append(fname)
-        if fname.lower().endswith(".dll"):
-            continue
-        fname += "*.dll"
-        files = glob.glob(fname)
-        if files:
-            results.extend(files)
-    return results
+def set_logger():
+    '''
+    set logger
+    '''
+    logger = logging.getLogger('ctypes_libsodium')
+    logger.setLevel(logging.INFO)
+    hdr = logging.StreamHandler()
+    formatter = logging.Formatter('%(asctime)s %(name)s:%(levelname)s %(message)s',
+                                  datefmt='%H:%M:%S')
+    hdr.setFormatter(formatter)
+    logger.addHandler(hdr)
+
+
+set_logger()
 
 
 def find_library(possible_lib_names, search_symbol, library_name):
+    '''
+    find_library
+    '''
     import ctypes.util
 
     paths = []
 
-    if type(possible_lib_names) not in (list, tuple):
+    if isinstance(possible_lib_names, str):
         possible_lib_names = [possible_lib_names]
 
     lib_names = []
@@ -100,12 +92,9 @@ def find_library(possible_lib_names, search_symbol, library_name):
         lib_names.append('lib' + lib_name)
 
     for name in lib_names:
-        if os.name == "nt":
-            paths.extend(find_library_nt(name))
-        else:
-            path = ctypes.util.find_library(name)
-            if path:
-                paths.append(path)
+        path = ctypes.util.find_library(name)
+        if path:
+            paths.append(path)
 
     if not paths:
         # We may get here when find_library fails because, for example,
@@ -118,50 +107,52 @@ def find_library(possible_lib_names, search_symbol, library_name):
                 '/usr/local/lib*/lib%s.*' % name,
                 '/usr/lib*/lib%s.*' % name,
                 'lib%s.*' % name,
-                '%s.dll' % name]
+                ]
 
             for pat in patterns:
                 files = glob.glob(pat)
                 if files:
                     paths.extend(files)
+
+    logger = logging.getLogger('ctypes_libsodium')
     for path in paths:
         try:
             lib = CDLL(path)
             if hasattr(lib, search_symbol):
                 logger.info('loading %s from %s', library_name, path)
                 return lib
-            else:
-                logger.warn('can\'t find symbol %s in %s', search_symbol, path)
-        except Exception:
+            logger.warning('can\'t find symbol %s in %s', search_symbol, path)
+        except OSError:
             pass
     return None
 
 
 def load_libsodium():
-    global loaded, libsodium, buf
+    '''load_libsodium'''
+    global LOADED, LIBSODIUM
 
-    libsodium = find_library('sodium', 'crypto_stream_salsa20_xor_ic', 'libsodium')
+    LIBSODIUM = find_library('sodium', 'crypto_stream_salsa20_xor_ic', 'libsodium')
 
-    if libsodium is None:
-        raise Exception('libsodium not found')
+    if LIBSODIUM is None:
+        raise OSError('libsodium not found')
 
-    if libsodium.sodium_init() < 0:
-        raise Exception('libsodium init failed')
+    if LIBSODIUM.sodium_init() < 0:
+        raise OSError('libsodium init failed')
 
-    libsodium.sodium_init.restype = c_int
-    libsodium.crypto_stream_salsa20_xor_ic.restype = c_int
-    libsodium.crypto_stream_salsa20_xor_ic.argtypes = (c_void_p, c_char_p,
+    LIBSODIUM.sodium_init.restype = c_int
+    LIBSODIUM.crypto_stream_salsa20_xor_ic.restype = c_int
+    LIBSODIUM.crypto_stream_salsa20_xor_ic.argtypes = (c_void_p, c_char_p,
                                                        c_ulonglong,
                                                        c_char_p, c_ulonglong,
                                                        c_char_p)
-    libsodium.crypto_stream_chacha20_xor_ic.restype = c_int
-    libsodium.crypto_stream_chacha20_xor_ic.argtypes = (c_void_p, c_char_p,
+    LIBSODIUM.crypto_stream_chacha20_xor_ic.restype = c_int
+    LIBSODIUM.crypto_stream_chacha20_xor_ic.argtypes = (c_void_p, c_char_p,
                                                         c_ulonglong,
                                                         c_char_p, c_ulonglong,
                                                         c_char_p)
 
-    libsodium.crypto_stream_chacha20_ietf_xor_ic.restype = c_int
-    libsodium.crypto_stream_chacha20_ietf_xor_ic.argtypes = (
+    LIBSODIUM.crypto_stream_chacha20_ietf_xor_ic.restype = c_int
+    LIBSODIUM.crypto_stream_chacha20_ietf_xor_ic.argtypes = (
         c_void_p, c_char_p,
         c_ulonglong,
         c_char_p,
@@ -169,16 +160,16 @@ def load_libsodium():
         c_char_p
     )
 
-    libsodium.crypto_aead_chacha20poly1305_ietf_encrypt.restype = c_int
-    libsodium.crypto_aead_chacha20poly1305_ietf_encrypt.argtypes = (
+    LIBSODIUM.crypto_aead_chacha20poly1305_ietf_encrypt.restype = c_int
+    LIBSODIUM.crypto_aead_chacha20poly1305_ietf_encrypt.argtypes = (
         c_void_p, c_void_p,
         c_char_p, c_ulonglong,
         c_char_p, c_ulonglong,
         c_char_p,
         c_char_p, c_char_p
     )
-    libsodium.crypto_aead_chacha20poly1305_ietf_decrypt.restype = c_int
-    libsodium.crypto_aead_chacha20poly1305_ietf_decrypt.argtypes = (
+    LIBSODIUM.crypto_aead_chacha20poly1305_ietf_decrypt.restype = c_int
+    LIBSODIUM.crypto_aead_chacha20poly1305_ietf_decrypt.argtypes = (
         c_void_p, c_void_p,
         c_char_p,
         c_char_p, c_ulonglong,
@@ -186,108 +177,138 @@ def load_libsodium():
         c_char_p, c_char_p
     )
 
-    libsodium.sodium_init()
+    LIBSODIUM.sodium_init()
 
-    buf = create_string_buffer(buf_size)
-    loaded = True
+    LOADED = True
 
 
-class SodiumCrypto(object):
-    def __init__(self, cipher_name, key, iv, op):
-        if not loaded:
+class BaseCrypto(object):
+    '''common for SodiumCrypto and SodiumAeadCrypto
+    '''
+    buf_size = 1024 * 16
+
+    def __init__(self):
+        self._buf = create_string_buffer(self.buf_size)
+
+    def expand_buf(self):
+        '''expand_buf'''
+        self.buf_size = self.buf_size * 2
+        self._buf = create_string_buffer(self.buf_size)
+
+
+class SodiumCrypto(BaseCrypto):
+    '''
+    stream cipher:
+      salsa20
+      chacha20
+      chacha20-ietf
+
+    '''
+
+    def __init__(self, cipher_name, key, iv):
+        if not LOADED:
             load_libsodium()
-        self.key = key
-        self.iv = iv
-        self.key_ptr = c_char_p(key)
-        self.iv_ptr = c_char_p(iv)
+        self._key = key
+        self._key_ptr = c_char_p(key)
+        self._iv = iv
+        self._iv_ptr = c_char_p(iv)
         if cipher_name == 'salsa20':
-            self.cipher = libsodium.crypto_stream_salsa20_xor_ic
+            self._cipher = LIBSODIUM.crypto_stream_salsa20_xor_ic
         elif cipher_name == 'chacha20':
-            self.cipher = libsodium.crypto_stream_chacha20_xor_ic
+            self._cipher = LIBSODIUM.crypto_stream_chacha20_xor_ic
         elif cipher_name == 'chacha20-ietf':
-            self.cipher = libsodium.crypto_stream_chacha20_ietf_xor_ic
+            self._cipher = LIBSODIUM.crypto_stream_chacha20_ietf_xor_ic
         else:
-            raise Exception('Unknown cipher')
+            raise ValueError('Unknown cipher')
         # byte counter, not block counter
-        self.counter = 0
+        self._counter = 0
+        super().__init__()
 
     def update(self, data):
-        global buf_size, buf
-        l = len(data)
+        '''
+        encrypt / decrypt
+        '''
+        data_len = len(data)
 
         # we can only prepend some padding to make the encryption align to
         # blocks
-        padding = self.counter % BLOCK_SIZE
-        while buf_size < padding + l:
-            buf_size = buf_size * 2
-            buf = create_string_buffer(buf_size)
+        padding = self._counter % BLOCK_SIZE
+        while self.buf_size < padding + data_len:
+            self.expand_buf()
 
         if padding:
             data = (b'\0' * padding) + data
-        self.cipher(byref(buf), c_char_p(data), padding + l,
-                    self.iv_ptr, self.counter // BLOCK_SIZE, self.key_ptr)
-        self.counter += l
+        self._cipher(byref(self._buf), c_char_p(data), padding + data_len,
+                     self._iv_ptr, self._counter // BLOCK_SIZE, self._key_ptr)
+        self._counter += data_len
         # buf is copied to a str object when we access buf.raw
         # strip off the padding
-        return buf.raw[padding:padding + l]
+        return self._buf.raw[padding:padding + data_len]
 
 
-class SodiumAeadCrypto(object):
+class SodiumAeadCrypto(BaseCrypto):
+    '''
+    chacha20-ietf-poly1305
+    '''
+
     def __init__(self, cipher_name, key):
-        if not loaded:
+        if not LOADED:
             load_libsodium()
-        self.__key = key
+        self._key = key
         self._tlen = 16
 
         if cipher_name == 'chacha20-ietf-poly1305':
-            self._encryptor = libsodium.crypto_aead_chacha20poly1305_ietf_encrypt
-            self._decryptor = libsodium.crypto_aead_chacha20poly1305_ietf_decrypt
+            self._encryptor = LIBSODIUM.crypto_aead_chacha20poly1305_ietf_encrypt
+            self._decryptor = LIBSODIUM.crypto_aead_chacha20poly1305_ietf_decrypt
         else:
             raise Exception('Unknown cipher')
+        super().__init__()
 
     def encrypt(self, nonce, data, associated):
-        global buf, buf_size
+        '''
+        aead encrypt
+        '''
         plen = len(data)
-        while buf_size < plen + self._tlen:
-            buf_size = buf_size * 2
-            buf = create_string_buffer(buf_size)
+        while self.buf_size < plen + self._tlen:
+            self.expand_buf()
 
         cipher_out_len = c_ulonglong(0)
         associated_p = c_char_p(associated) if associated else None
         associated_l = c_ulonglong(len(associated)) if associated else c_ulonglong(0)
         self._encryptor(
-            byref(buf), byref(cipher_out_len),
+            byref(self._buf), byref(cipher_out_len),
             c_char_p(data), c_ulonglong(plen),
             associated_p, associated_l,
             None,
-            c_char_p(nonce), c_char_p(self.__key)
+            c_char_p(nonce), c_char_p(self._key)
         )
         if cipher_out_len.value != plen + self._tlen:
             raise Exception("Encrypt failed")
 
-        return buf.raw[:cipher_out_len.value]
+        return self._buf.raw[:cipher_out_len.value]
 
     def decrypt(self, nonce, data, associated):
-        global buf, buf_size
+        '''
+        aead decrypt
+        '''
         clen = len(data)
-        while buf_size < clen:
-            buf_size = buf_size * 2
-            buf = create_string_buffer(buf_size)
+        while self.buf_size < clen:
+            self.expand_buf()
 
         cipher_out_len = c_ulonglong(0)
         associated_p = c_char_p(associated) if associated else None
         associated_l = c_ulonglong(len(associated)) if associated else c_ulonglong(0)
-        r = self._decryptor(
-            byref(buf), byref(cipher_out_len),
+        result = self._decryptor(
+            byref(self._buf), byref(cipher_out_len),
             None,
             c_char_p(data), c_ulonglong(clen),
             associated_p, associated_l,
-            c_char_p(nonce), c_char_p(self.__key)
+            c_char_p(nonce), c_char_p(self._key)
         )
-        if r != 0:
+        if result != 0:
             raise InvalidTag
 
         if cipher_out_len.value != clen - self._tlen:
             raise Exception("Decrypt failed, length not match")
 
-        return buf.raw[:cipher_out_len.value]
+        return self._buf.raw[:cipher_out_len.value]

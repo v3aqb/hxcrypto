@@ -1,6 +1,5 @@
-from setuptools import setup, find_packages
 
-long_description = 'cryptography module for shadowsocks and hxsocks'
+from setuptools import setup
 
 setup(
     name="hxcrypto",
@@ -10,10 +9,8 @@ setup(
     author='v3aqb',
     author_email='null',
     url='https://github.com/v3aqb/hxcrypto',
-    packages=find_packages(),
-    package_data={
-        'hxcrypto': ['README.rst', 'COPYING']
-    },
+    packages=['hxcrypto'],
+    package_data={'hxcrypto': ['translate/*.qm']},
     install_requires=["cryptography >= 2.1"],
     classifiers=[
         'License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)',
@@ -22,7 +19,7 @@ setup(
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
         'Topic :: Internet :: Proxy Servers',
     ],
-    long_description=long_description,
 )

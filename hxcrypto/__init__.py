@@ -1,4 +1,6 @@
-
+"""
+cryptography module for shadowsocks and hxsocks
+"""
 # Copyright (c) 2017-2018 v3aqb
 
 # This library is free software; you can redistribute it and/or
@@ -18,10 +20,22 @@
 
 
 __version__ = '0.0.3'
+from hmac import compare_digest
 
-from cryptography.exceptions import InvalidSignature
+from cryptography.exceptions import InvalidSignature, InvalidTag
 
-from .encrypt import BufEmptyError, InvalidTag, is_aead, Encryptor, AEncryptor, IVError, compare_digest, method_supported
+from .encrypt import BufEmptyError, is_aead, Encryptor, AEncryptor, IVError
+from .encrypt import METHOD_SUPPORTED as method_supported
 from .ecc import ECC
 
-__all__ = ['BufEmptyError', 'InvalidSignature', 'InvalidTag', 'is_aead', 'Encryptor', 'AEncryptor', 'IVError', 'ECC', 'compare_digest', 'method_supported']
+__all__ = ['BufEmptyError',
+           'InvalidSignature',
+           'InvalidTag',
+           'is_aead',
+           'Encryptor',
+           'AEncryptor',
+           'IVError',
+           'ECC',
+           'compare_digest',
+           'method_supported',
+           ]

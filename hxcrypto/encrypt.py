@@ -2,7 +2,7 @@
 # coding: UTF-8
 #
 
-# Copyright (c) 2013-2018 v3aqb
+# Copyright (c) 2013-2019 v3aqb
 
 # This file is part of hxcrypto.
 
@@ -46,66 +46,50 @@
 import os
 import sys
 import hashlib
-import hmac
 import struct
-
-from .iv_checker import IVChecker, IVError
+import hmac
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes, aead
 
-try:
-    from hmac import compare_digest
-except ImportError:
-    def compare_digest(a, b):
-        # if a and b are identical, return True
-        if isinstance(a, str):
-            if len(a) != len(b):
-                return False
-            result = 0
-            for x, y in zip(a, b):
-                result |= ord(x) ^ ord(y)
-            return result == 0
-        else:
-            if len(a) != len(b):
-                return False
-            result = 0
-            for x, y in zip(a, b):
-                result |= x ^ y
-            return result == 0
+from .iv_checker import IVChecker, IVError
+
+SS_SUBKEY = b"ss-subkey"
 
 
-class BufEmptyError(Exception):
-    pass
+class BufEmptyError(ValueError):
+    '''BufEmptyError'''
 
 
 def random_string(size):
+    '''random_string'''
     return os.urandom(size)
 
 
 def EVP_BytesToKey(password, key_len):
-    # equivalent to OpenSSL's EVP_BytesToKey() with count 1
-    # so that we make the same key and iv as nodejs version
-    m = []
+    ''' equivalent to OpenSSL's EVP_BytesToKey() with count 1
+        so that we make the same key and iv as nodejs version'''
+    m_list = []
     _len = 0
 
     while _len < key_len:
         md5 = hashlib.md5()
         data = password
-        if len(m) > 0:
-            data = m[len(m) - 1] + password
+        if m_list:
+            data = m_list[len(m_list) - 1] + password
         md5.update(data)
-        m.append(md5.digest())
+        m_list.append(md5.digest())
         _len += 16
-    ms = b''.join(m)
-    return ms[:key_len]
+    key = b''.join(m_list)
+    return key[:key_len]
 
 
-def check(key, method):
-    Encryptor(key, method)  # test if the settings if OK
+def check(key, method_):
+    '''check if method_ is supported'''
+    Encryptor(key, method_)  # test if the settings if OK
 
 
-method_supported = {
+METHOD_SUPPORTED = {
     # 'id': (key_len, ivlen, is_aead)
     'aes-128-cfb': (16, 16, False),
     'aes-192-cfb': (24, 16, False),
@@ -126,31 +110,36 @@ method_supported = {
 }
 
 
-def is_aead(method):
-    return method_supported.get(method)[2]
+def is_aead(method_):
+    '''return if method_ is AEAD'''
+    return METHOD_SUPPORTED.get(method_)[2]
 
 
-class bypass(object):
-    def __init__(self):
-        pass
+# class bypass(object):
+#     '''dummy stream cipher'''
+#     def __init__(self):
+#         pass
 
-    def update(self, buf):
-        return buf
+#     def update(self, buf):
+#         '''fake encrypt / decrypt'''
+#         return buf
 
 
 IV_CHECKER = IVChecker(1048576, 3600)
 
 
-class chacha20_ietf(object):
-    def __init__(self, cipher_name, key, iv, op):
-        self.key = key
-        self.iv = iv
+class Chacha20IETF(object):
+    '''chacha20-ietf with python-cryptography'''
+    def __init__(self, cipher_name, key, iv):
+        self._key = key
+        self._iv = iv
         assert cipher_name == 'chacha20-ietf'
 
         # byte counter, not block counter
         self.counter = 0
 
     def update(self, data):
+        '''encrypt / decrypt'''
         data_len = len(data)
 
         # we can only prepend some padding to make the encryption align to
@@ -159,25 +148,26 @@ class chacha20_ietf(object):
         if padding:
             data = (b'\0' * padding) + data
 
-        nonce = struct.pack("<i", self.counter // 64) + self.iv
+        nonce = struct.pack("<i", self.counter // 64) + self._iv
 
-        algorithm = algorithms.ChaCha20(self.key, nonce)
+        algorithm = algorithms.ChaCha20(self._key, nonce)
         cipher = Cipher(algorithm, mode=None, backend=default_backend())
         encryptor = cipher.encryptor()
-        ct = encryptor.update(data)
+        cipher_text = encryptor.update(data)
 
         self.counter += data_len
 
-        return ct[padding:]
+        return cipher_text[padding:]
 
 
-def get_cipher(key, method, op, iv):
-    if method == 'bypass':
-        return bypass()
-    elif method == 'rc4-md5':
+def get_cipher(key, method, op_, iv_):
+    '''get stream cipher'''
+    # if method == 'bypass':
+    #     return bypass()
+    if method == 'rc4-md5':
         md5 = hashlib.md5()
         md5.update(key)
-        md5.update(iv)
+        md5.update(iv_)
         key = md5.digest()
         method = 'rc4'
     cipher = None
@@ -185,9 +175,9 @@ def get_cipher(key, method, op, iv):
     if method in ('rc4', 'chacha20-ietf'):
         pass
     elif method.endswith('ctr'):
-        mode = modes.CTR(iv)
+        mode = modes.CTR(iv_)
     elif method.endswith('cfb'):
-        mode = modes.CFB(iv)
+        mode = modes.CFB(iv_)
     else:
         raise ValueError('operation mode "%s" not supported!' % method.upper())
 
@@ -195,10 +185,10 @@ def get_cipher(key, method, op, iv):
         cipher = Cipher(algorithms.ARC4(key), None, default_backend())
     elif method == 'chacha20-ietf':
         try:
-            return chacha20_ietf(method, key, iv, op)
-        except Exception:
+            return Chacha20IETF(method, key, iv_)
+        except OSError:
             from .ctypes_libsodium import SodiumCrypto
-            return SodiumCrypto(method, key, iv, op)
+            return SodiumCrypto(method, key, iv_)
     elif method.startswith('aes'):
         cipher = Cipher(algorithms.AES(key), mode, default_backend())
     elif method.startswith('camellia'):
@@ -206,19 +196,19 @@ def get_cipher(key, method, op, iv):
     else:
         raise ValueError('crypto algorithm "%s" not supported!' % method.upper())
 
-    return cipher.encryptor() if op else cipher.decryptor()
+    return cipher.encryptor() if op_ else cipher.decryptor()
 
 
-class Encryptor_Stream(object):
+class EncryptorStream(object):
     def __init__(self, password, method):
-        if method not in method_supported:
+        if method not in METHOD_SUPPORTED:
             raise ValueError('encryption method not supported')
         if not isinstance(password, bytes):
             password = password.encode('utf8')
 
         self.method = method
-        self._key_len, self._iv_len, is_aead = method_supported.get(method)
-        if is_aead:
+        self._key_len, self._iv_len, _aead = METHOD_SUPPORTED.get(method)
+        if _aead:
             raise ValueError('AEAD method is not supported by Encryptor class!')
 
         self.__key = EVP_BytesToKey(password, self._key_len)
@@ -226,65 +216,56 @@ class Encryptor_Stream(object):
         self._encryptor = None
         self._decryptor = None
 
-    def encrypt(self, buf):
-        if not buf:
+    def encrypt(self, data):
+        if not data:
             raise BufEmptyError
         if not self._encryptor:
             while True:
-                _len = len(buf) + self._iv_len - 2
-                iv = struct.pack(">H", _len) + random_string(self._iv_len - 2)
+                _len = len(data) + self._iv_len - 2
+                iv_ = struct.pack(">H", _len) + random_string(self._iv_len - 2)
                 try:
-                    IV_CHECKER.check(self.__key, iv)
+                    IV_CHECKER.check(self.__key, iv_)
                 except IVError:
                     continue
                 break
-            self._encryptor = get_cipher(self.__key, self.method, 1, iv)
-            return iv + self._encryptor.update(buf)
-        return self._encryptor.update(buf)
+            self._encryptor = get_cipher(self.__key, self.method, 1, iv_)
+            return iv_ + self._encryptor.update(data)
+        return self._encryptor.update(data)
 
-    def decrypt(self, buf):
-        if not buf:
+    def decrypt(self, data):
+        if not data:
             raise BufEmptyError
         if self._decryptor is None:
-            iv = buf[:self._iv_len]
-            IV_CHECKER.check(self.__key, iv)
-            self._decryptor = get_cipher(self.__key, self.method, 0, iv)
-            buf = buf[self._iv_len:]
-            if len(buf) == 0:
-                return
-        return self._decryptor.update(buf)
-
-
-key_len_to_hash = {
-    16: hashlib.md5,
-    24: hashlib.sha1,
-    32: hashlib.sha256,
-}
-
-SS_SUBKEY = b"ss-subkey"
+            iv_ = data[:self._iv_len]
+            IV_CHECKER.check(self.__key, iv_)
+            self._decryptor = get_cipher(self.__key, self.method, 0, iv_)
+            data = data[self._iv_len:]
+            if not data:
+                return b''
+        return self._decryptor.update(data)
 
 
 def Encryptor(password, method):
-    # return shadowsocks Encryptor
+    '''return shadowsocks Encryptor'''
     if is_aead(method):
-        return AEncryptor_AEAD(password, method, SS_SUBKEY)
-    else:
-        return Encryptor_Stream(password, method)
+        return AEncryptorAEAD(password, method, SS_SUBKEY)
+    return EncryptorStream(password, method)
 
 
 def AEncryptor(key, method, ctx):
     if not is_aead(method):
         method = 'chacha20-ietf-poly1305'
-    return AEncryptor_AEAD(key, method, ctx)
+    return AEncryptorAEAD(key, method, ctx)
 
 
 if sys.version_info[0] == 3:
-    def buffer(x):
-        return x
+    def buffer(buf):
+        return buf
 
 
 def get_aead_cipher(key, method):
-    # method should be AEAD method
+    '''get_aead_cipher
+       method should be AEAD method'''
     if method.startswith('aes'):
         return aead.AESGCM(key)
     try:
@@ -294,25 +275,25 @@ def get_aead_cipher(key, method):
         return SodiumAeadCrypto(method, key)
 
 
-class AEncryptor_AEAD(object):
+class AEncryptorAEAD(object):
     '''
     Provide Authenticated Encryption, compatible with shadowsocks AEAD mode.
     '''
+    NONCE_LEN = 12
+    TAG_LEN = 16
+
     def __init__(self, key, method, ctx):
-        if method not in method_supported:
+        if method not in METHOD_SUPPORTED:
             raise ValueError('encryption method not supported')
 
-        self._key_len, self._iv_len, is_aead = method_supported.get(method)
-        if not is_aead:
+        self._key_len, self._iv_len, _aead = METHOD_SUPPORTED.get(method)
+        if not _aead:
             raise ValueError('non-AEAD method is not supported by AEncryptor_AEAD class!')
 
         self.method = method
 
         self._ctx = ctx  # SUBKEY_INFO
         self.__key = key
-
-        self._nonce_len = 12
-        self._tag_len = 16
 
         if self._ctx == b"ss-subkey":
             self.encrypt = self.encrypt_ss
@@ -344,7 +325,7 @@ class AEncryptor_AEAD(object):
             okm += output_block
         return okm[:self._key_len]
 
-    def _encrypt(self, data, ad=None, data_len=None):
+    def _encrypt(self, data, associated_data=None, data_len=None):
         '''
         TCP Chunk (after encryption, *ciphertext*)
         +--------------+------------+
@@ -362,101 +343,46 @@ class AEncryptor_AEAD(object):
         self._encryptor_nonce += 1
 
         if not self._encryptor:
-            _len = len(data) + self._iv_len + self._tag_len - 2
+            _len = len(data) + self._iv_len + self.TAG_LEN - 2
             if self._ctx == b"ss-subkey":
-                _len += self._tag_len + data_len
+                _len += self.TAG_LEN + data_len
 
             while True:
                 if self._ctx == b"ss-subkey":
-                    iv = struct.pack(">H", _len) + random_string(self._iv_len - 2)
+                    iv_ = struct.pack(">H", _len) + random_string(self._iv_len - 2)
                 else:
-                    iv = random_string(self._iv_len)
+                    iv_ = random_string(self._iv_len)
                 try:
-                    IV_CHECKER.check(self.__key, iv)
+                    IV_CHECKER.check(self.__key, iv_)
                 except IVError:
                     continue
                 break
-            _encryptor_skey = self.key_expand(self.__key, iv)
+            _encryptor_skey = self.key_expand(self.__key, iv_)
             self._encryptor = get_aead_cipher(_encryptor_skey, self.method)
-            ct = self._encryptor.encrypt(nonce, data, ad)
-            ct = iv + ct
+            cipher_text = self._encryptor.encrypt(nonce, data, associated_data)
+            cipher_text = iv_ + cipher_text
         else:
-            ct = self._encryptor.encrypt(nonce, data, ad)
+            cipher_text = self._encryptor.encrypt(nonce, data, associated_data)
 
-        return ct
+        return cipher_text
 
     def encrypt_ss(self, data):
-        a = self._encrypt(struct.pack("!H", len(data)), data_len=len(data))
-        b = self._encrypt(data)
-        return a + b
+        ct1 = self._encrypt(struct.pack("!H", len(data)), data_len=len(data))
+        ct2 = self._encrypt(data)
+        return ct1 + ct2
 
-    def decrypt(self, data, ad=None):
+    def decrypt(self, data, associated_data=None):
         if not data:
             raise BufEmptyError
 
         if self._decryptor is None:
-            iv, data = data[:self._iv_len], data[self._iv_len:]
-            IV_CHECKER.check(self.__key, iv)
-            _decryptor_skey = self.key_expand(self.__key, iv)
+            iv_, data = data[:self._iv_len], data[self._iv_len:]
+            IV_CHECKER.check(self.__key, iv_)
+            _decryptor_skey = self.key_expand(self.__key, iv_)
             self._decryptor = get_aead_cipher(_decryptor_skey, self.method)
 
         if not data:
-            return
+            return b''
         nonce = struct.pack('<Q', self._decryptor_nonce) + b'\x00\x00\x00\x00'
         self._decryptor_nonce += 1
-        return self._decryptor.decrypt(nonce, data, ad)
-
-
-if __name__ == '__main__':
-    # disable ivchecker
-
-    class ivchecker(object):
-        def __init__(self, size, timeout):
-            pass
-
-        def check(self, key, iv):
-            pass
-
-    IV_CHECKER = ivchecker(1, 1)
-
-    print('encrypt and decrypt 20MB data.')
-    s = os.urandom(10240)
-    import time
-    lst = sorted(method_supported.keys())
-    for method in lst:
-        if is_aead(method):
-            continue
-        try:
-            cipher = Encryptor(b'123456', method)
-            t = time.clock()
-            for _ in range(1024):
-                a = cipher.encrypt(s)
-                b = cipher.encrypt(s)
-                c = cipher.decrypt(a)
-                d = cipher.decrypt(b)
-            print('%s %ss' % (method, time.clock() - t))
-        except Exception as e:
-            print(repr(e))
-
-    print('test AE GCM')
-    ae1 = AEncryptor_AEAD(b'123456', 'aes-128-gcm', b'ctx')
-    ae2 = AEncryptor_AEAD(b'123456', 'aes-128-gcm', b'ctx')
-    ct1 = ae1.encrypt(b'abcde')
-    ct2 = ae1.encrypt(b'fg')
-    print(ae2.decrypt(ct1))
-    print(ae2.decrypt(ct2))
-
-    for method in lst:
-        if is_aead(method):
-            try:
-                cipher1 = AEncryptor_AEAD(b'123456', method, b'ctx')
-                cipher2 = AEncryptor_AEAD(b'123456', method, b'ctx')
-                t = time.clock()
-                for _ in range(1024):
-                    ct1 = cipher1.encrypt(s)
-                    ct2 = cipher1.encrypt(s)
-                    cipher2.decrypt(ct1)
-                    cipher2.decrypt(ct2)
-                print('%s %ss' % (method, time.clock() - t))
-            except Exception as e:
-                print(repr(e))
+        return self._decryptor.decrypt(nonce, data, associated_data)
