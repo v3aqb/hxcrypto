@@ -22,6 +22,8 @@ This file is part of hxcrypto.
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
 # 02110-1301  USA
 
+import base64
+import hashlib
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -54,10 +56,16 @@ class ECC(object):
         '''get public key'''
         return self.ec_public.public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
 
+    def get_pub_key_b64u(self):
+        return base64.urlsafe_b64encode(self.get_pub_key()).decode()
+
     def get_dh_key(self, other):
         '''ECDH exchange'''
         peer_public_key = load_der_public_key(other, backend=default_backend())
         return self.ec_private.exchange(ec.ECDH(), peer_public_key)
+
+    def get_dh_key_b64u(self, other):
+        return self.get_dh_key(base64.urlsafe_b64decode(other))
 
     def save(self, path):
         '''save private key to file'''
@@ -75,6 +83,12 @@ class ECC(object):
            raise Exception if NOT verified.
         '''
         self.ec_public.verify(signature, data, ec.ECDSA(getattr(hashes, hash_algo)()))
+
+    @staticmethod
+    def b64u_to_hash(data):
+        data = base64.urlsafe_b64decode(data)
+        hash_ = hashlib.md5(data).digest()
+        return base64.urlsafe_b64encode(hash_).decode()[:8]
 
     @staticmethod
     def verify_with_pub_key(pubkey, data, signature, hash_algo):
