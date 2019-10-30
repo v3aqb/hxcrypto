@@ -63,22 +63,22 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.otherKeyEdit.setReadOnly(False)
 
     def exchange(self, otherkey):
-        try:
-            self.__key = self.__ecckey.get_dh_key_b64u(otherkey)
-        except Exception as err:
-            self.statusBar().showMessage(repr(err), 5000)
-            return
+        self.__key = self.__ecckey.get_dh_key_b64u(otherkey)
 
     def exchange_edit(self):
         if self.ui.otherKeyEdit.isReadOnly():
             return
         otherkey = self.ui.otherKeyEdit.text()
         if otherkey:
-            self.other_key = otherkey
-            self.exchange(otherkey)
-            pubk_hash = ECC.b64u_to_hash(otherkey)
-            self.ui.otherKeyEdit.setText(pubk_hash)
-            self.ui.otherKeyEdit.setReadOnly(True)
+            try:
+                self.exchange(otherkey)
+            except Exception as err:
+                self.statusBar().showMessage(repr(err), 5000)
+            else:
+                self.other_key = otherkey
+                pubk_hash = ECC.b64u_to_hash(otherkey)
+                self.ui.otherKeyEdit.setText(pubk_hash)
+                self.ui.otherKeyEdit.setReadOnly(True)
 
     def encrypt(self):
         if time.time() - self._last_active < 0.3:
