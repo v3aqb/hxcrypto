@@ -220,7 +220,7 @@ class EncryptorStream(object):
         if not data:
             raise BufEmptyError
         if not self._encryptor:
-            while True:
+            for _ in range(5):
                 _len = len(data) + self._iv_len - 2
                 iv_ = struct.pack(">H", _len) + random_string(self._iv_len - 2)
                 try:
@@ -228,6 +228,8 @@ class EncryptorStream(object):
                 except IVError:
                     continue
                 break
+            else:
+                raise IVError("unable to create iv")
             self._encryptor = get_cipher(self.__key, self.method, 1, iv_)
             return iv_ + self._encryptor.update(data)
         return self._encryptor.update(data)
@@ -347,7 +349,7 @@ class AEncryptorAEAD(object):
             if self._ctx == b"ss-subkey":
                 _len += self.TAG_LEN + data_len
 
-            while True:
+            for _ in range(5):
                 if self._ctx == b"ss-subkey":
                     iv_ = struct.pack(">H", _len) + random_string(self._iv_len - 2)
                 else:
@@ -357,6 +359,8 @@ class AEncryptorAEAD(object):
                 except IVError:
                     continue
                 break
+            else:
+                raise IVError("unable to create iv")
             _encryptor_skey = self.key_expand(self.__key, iv_)
             self._encryptor = get_aead_cipher(_encryptor_skey, self.method)
             cipher_text = self._encryptor.encrypt(nonce, data, associated_data)
