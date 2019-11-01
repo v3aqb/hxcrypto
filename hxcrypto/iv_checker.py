@@ -45,9 +45,6 @@ class IVStore(object):
             self.store.popitem()
 
     def __contains__(self, item):
-        if random.random() < 0.01:
-            self._clean()
-        self.last_time_used = time.time()
         try:
             if self.store[item] < time.time() - self.timeout:
                 while True:
@@ -55,8 +52,7 @@ class IVStore(object):
                     if a == item:
                         break
                 return False
-            else:
-                return True
+            return True
         except KeyError:
             return False
 
@@ -82,6 +78,7 @@ class IVChecker(object):
 
     def __init__(self, maxlen, timeout):
         self.timeout = timeout * 10
+        # create a IVStore for each key
         self.store = defaultdict(lambda: IVStore(maxlen, timeout * 2))
 
     def check(self, key, iv):
@@ -91,8 +88,8 @@ class IVChecker(object):
 
     def _clean(self):
         garbage = []
-        for k, v in self.store.items():
-            if v.last_time_used < time.time() - self.timeout:
-                garbage.append(k)
-        for k in garbage:
-            del self.store[k]
+        for key, store in self.store.items():
+            if store.last_time_used < time.time() - self.timeout:
+                garbage.append(key)
+        for key in garbage:
+            del self.store[key]
