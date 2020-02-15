@@ -94,12 +94,21 @@ METHOD_SUPPORTED = {
     'aes-128-cfb': (16, 16, False),
     'aes-192-cfb': (24, 16, False),
     'aes-256-cfb': (32, 16, False),
-    # 'aes-128-ctr': (16, 16, False),
-    # 'aes-192-ctr': (24, 16, False),
-    # 'aes-256-ctr': (32, 16, False),
+    'aes-128-ofb': (16, 16, False),
+    'aes-192-ofb': (24, 16, False),
+    'aes-256-ofb': (32, 16, False),
+    'aes-128-ctr': (16, 16, False),
+    'aes-192-ctr': (24, 16, False),
+    'aes-256-ctr': (32, 16, False),
     'camellia-128-cfb': (16, 16, False),
     'camellia-192-cfb': (24, 16, False),
     'camellia-256-cfb': (32, 16, False),
+    'camellia-128-ofb': (16, 16, False),
+    'camellia-192-ofb': (24, 16, False),
+    'camellia-256-ofb': (32, 16, False),
+    'camellia-128-ctr': (16, 16, False),
+    'camellia-192-ctr': (24, 16, False),
+    'camellia-256-ctr': (32, 16, False),
     'rc4-md5': (16, 16, False),
     'chacha20-ietf': (32, 12, False),
     # 'bypass': (16, 16, False),  # for testing only
@@ -178,6 +187,8 @@ def get_cipher(key, method, op_, iv_):
         mode = modes.CTR(iv_)
     elif method.endswith('cfb'):
         mode = modes.CFB(iv_)
+    elif method.endswith('ofb'):
+        mode = modes.OFB(iv_)
     else:
         raise ValueError('operation mode "%s" not supported!' % method.upper())
 
