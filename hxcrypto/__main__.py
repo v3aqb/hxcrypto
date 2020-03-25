@@ -1,7 +1,6 @@
 import os
 import sys
-from PyQt5 import QtGui, QtCore
-from PyQt5.QtWidgets import QApplication
+from PyQt5 import QtGui, QtCore, QtWidgets
 from .crypto import MainWindow
 
 
@@ -11,7 +10,7 @@ def main():
         myappid = 'v3aqb.crypto'  # arbitrary string
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
-    app = QApplication([])
+    app = QtWidgets.QApplication([])
     font = QtGui.QFont()
     if sys.platform.startswith('win'):
         font.setFamily("Consolas")
