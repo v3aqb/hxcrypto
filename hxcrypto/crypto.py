@@ -53,8 +53,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def copy_pubkey(self):
         public_key = self.get_pubkey_b64u()
-        import pyperclip
-        pyperclip.copy(public_key)
+        app = QtWidgets.QApplication.instance()
+        cb = app.clipboard()
+        cb.setText(public_key)
 
     def resetExchange(self):
         self.__key = None
