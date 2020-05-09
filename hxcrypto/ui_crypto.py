@@ -2,11 +2,13 @@
 
 # Form implementation generated from reading ui file './hxcrypto\crypto.ui'
 #
-# Created by: PyQt5 UI code generator 5.11.3
+# Created by: PyQt5 UI code generator 5.13.2
 #
 # WARNING! All changes made in this file will be lost!
 
+
 from PyQt5 import QtCore, QtGui, QtWidgets
+
 
 class Ui_Crypto(object):
     def setupUi(self, Crypto):
@@ -132,7 +134,7 @@ class Ui_Crypto(object):
 
     def retranslateUi(self, Crypto):
         _translate = QtCore.QCoreApplication.translate
-        Crypto.setWindowTitle(_translate("Crypto", "Crypto"))
+        Crypto.setWindowTitle(_translate("Crypto", "hxcrypto"))
         self.label.setText(_translate("Crypto", "Step1: Send your public key to other side"))
         self.pubkeyButton.setText(_translate("Crypto", "Copy Public Key"))
         self.resetPrivateButton.setText(_translate("Crypto", "Reset Private Key"))
@@ -146,4 +148,3 @@ class Ui_Crypto(object):
         self.PSKencryptButton.setText(_translate("Crypto", "Encrypt"))
         self.PSKdecryptButton.setText(_translate("Crypto", "Decrypt"))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_2), _translate("Crypto", "AEAD"))
-
