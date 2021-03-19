@@ -134,7 +134,7 @@ def is_aead(method_):
 #         return buf
 
 
-IV_CHECKER = IVChecker(1048576, 3600)
+IV_CHECKER = IVChecker()
 
 
 class Chacha20IETF(object):

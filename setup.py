@@ -11,15 +11,14 @@ setup(
     url='https://github.com/v3aqb/hxcrypto',
     packages=['hxcrypto'],
     package_data={'hxcrypto': ['translate/*.qm']},
-    install_requires=["cryptography >= 2.1"],
+    install_requires=["cryptography >= 2.1", "dmfrbloom", "mmh3"],
     classifiers=[
         'License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)',
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3.3',
-        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
         'Topic :: Internet :: Proxy Servers',
     ],
 )
