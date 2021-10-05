@@ -195,11 +195,7 @@ def get_cipher(key, method, op_, iv_):
     if method == 'rc4':
         cipher = Cipher(algorithms.ARC4(key), None, default_backend())
     elif method == 'chacha20-ietf':
-        try:
-            return Chacha20IETF(method, key, iv_)
-        except OSError:
-            from .ctypes_libsodium import SodiumCrypto
-            return SodiumCrypto(method, key, iv_)
+        return Chacha20IETF(method, key, iv_)
     elif method.startswith('aes'):
         cipher = Cipher(algorithms.AES(key), mode, default_backend())
     elif method.startswith('camellia'):
