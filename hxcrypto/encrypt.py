@@ -307,7 +307,7 @@ class AEncryptorAEAD(object):
         self._ctx = ctx  # SUBKEY_INFO
         self.__key = key
 
-        if self._ctx == b"ss-subkey":
+        if self._ctx == SS_SUBKEY:
             self.encrypt = self.encrypt_ss
             if not isinstance(key, bytes):
                 key = key.encode('utf8')
@@ -323,7 +323,7 @@ class AEncryptorAEAD(object):
         self._decryptor_nonce = 0
 
     def key_expand(self, key, iv):
-        algo = hashlib.sha1 if self._ctx == b"ss-subkey" else hashlib.sha256
+        algo = hashlib.sha1 if self._ctx == SS_SUBKEY else hashlib.sha256
         prk = hmac.new(iv, key, algo).digest()
 
         hash_len = algo().digest_size
@@ -357,11 +357,11 @@ class AEncryptorAEAD(object):
 
         if not self._encryptor:
             _len = len(data) + self._iv_len + self.TAG_LEN - 2
-            if self._ctx == b"ss-subkey":
+            if self._ctx == SS_SUBKEY:
                 _len += self.TAG_LEN + data_len
 
             for _ in range(5):
-                if self._ctx == b"ss-subkey":
+                if self._ctx == SS_SUBKEY:
                     iv_ = struct.pack(">H", _len) + random_string(self._iv_len - 2)
                 else:
                     iv_ = random_string(self._iv_len)
