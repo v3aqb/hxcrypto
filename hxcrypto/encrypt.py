@@ -263,10 +263,10 @@ def Encryptor(password, method):
     return EncryptorStream(password, method)
 
 
-def AEncryptor(key, method, ctx):
+def AEncryptor(key, method, ctx, check_iv=True):
     if not is_aead(method):
         method = 'chacha20-ietf-poly1305'
-    return AEncryptorAEAD(key, method, ctx)
+    return AEncryptorAEAD(key, method, ctx, check_iv)
 
 
 if sys.version_info[0] == 3:
@@ -293,7 +293,7 @@ class AEncryptorAEAD(object):
     NONCE_LEN = 12
     TAG_LEN = 16
 
-    def __init__(self, key, method, ctx):
+    def __init__(self, key, method, ctx, check_iv=True):
         if method not in METHOD_SUPPORTED:
             raise ValueError('encryption method not supported')
 
@@ -306,6 +306,7 @@ class AEncryptorAEAD(object):
 
         self._ctx = ctx  # SUBKEY_INFO
         self.__key = key
+        self.check_iv = check_iv
 
         if self._ctx == SS_SUBKEY:
             self.encrypt = self.encrypt_ss
@@ -392,7 +393,8 @@ class AEncryptorAEAD(object):
 
         if self._decryptor is None:
             iv_, data = data[:self._iv_len], data[self._iv_len:]
-            IV_CHECKER.check(self.__key, iv_)
+            if self.check_iv:
+                IV_CHECKER.check(self.__key, iv_)
             _decryptor_skey = self.key_expand(self.__key, iv_)
             self._decryptor = get_aead_cipher(_decryptor_skey, self.method)
 
