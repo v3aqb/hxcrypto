@@ -52,7 +52,7 @@ import hmac
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes, aead
 
-from .iv_checker import IVChecker, IVError
+from .iv_checker import iv_checker, IVError
 
 SS_SUBKEY = b"ss-subkey"
 
@@ -132,9 +132,6 @@ def is_aead(method_):
 #     def update(self, buf):
 #         '''fake encrypt / decrypt'''
 #         return buf
-
-
-IV_CHECKER = IVChecker()
 
 
 class Chacha20IETF(object):
@@ -236,7 +233,7 @@ class EncryptorStream(object):
                 else:
                     iv_ = random_string(self._iv_len)
                 try:
-                    IV_CHECKER.check(self.__key, iv_)
+                    iv_checker.check(self.__key, iv_)
                 except IVError:
                     continue
                 break
@@ -251,7 +248,7 @@ class EncryptorStream(object):
             raise BufEmptyError
         if self._decryptor is None:
             iv_ = data[:self._iv_len]
-            IV_CHECKER.check(self.__key, iv_)
+            iv_checker.check(self.__key, iv_)
             self._decryptor = get_cipher(self.__key, self.method, 0, iv_)
             data = data[self._iv_len:]
             if not data:
@@ -282,11 +279,7 @@ def get_aead_cipher(key, method):
        method should be AEAD method'''
     if method.startswith('aes'):
         return aead.AESGCM(key)
-    try:
-        return aead.ChaCha20Poly1305(key)
-    except Exception:
-        from .ctypes_libsodium import SodiumAeadCrypto
-        return SodiumAeadCrypto(method, key)
+    return aead.ChaCha20Poly1305(key)
 
 
 class AEncryptorAEAD(object):
@@ -370,7 +363,7 @@ class AEncryptorAEAD(object):
                 else:
                     iv_ = random_string(self._iv_len)
                 try:
-                    IV_CHECKER.check(self.__key, iv_)
+                    iv_checker.check(self.__key, iv_)
                 except IVError:
                     continue
                 break
@@ -397,7 +390,7 @@ class AEncryptorAEAD(object):
         if self._decryptor is None:
             iv_, data = data[:self._iv_len], data[self._iv_len:]
             if self.check_iv:
-                IV_CHECKER.check(self.__key, iv_)
+                iv_checker.check(self.__key, iv_)
             _decryptor_skey = self.key_expand(self.__key, iv_)
             self._decryptor = get_aead_cipher(_decryptor_skey, self.method)
 

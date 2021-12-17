@@ -17,8 +17,6 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
 # 02110-1301  USA
 
-import random
-import time
 from collections import defaultdict
 from dmfrbloom.bloomfilter import BloomFilter as _BloomFilter
 
@@ -28,12 +26,12 @@ class BloomFilter(_BloomFilter):
         super().__init__(expected_items, fp_rate)
         self.count = 0
 
-    def add(self, item):
-        super().add(item)
+    def add(self, element):
+        super().add(element)
         self.count += 1
 
-    def __contains__(self, item):
-        return self.lookup(item)
+    def __contains__(self, element):
+        return self.lookup(element)
 
     def __len__(self):
         return self.count
@@ -80,3 +78,6 @@ class IVChecker(object):
 
     def check(self, key, iv):
         self.store[key].add(iv)
+
+
+iv_checker = IVChecker()
