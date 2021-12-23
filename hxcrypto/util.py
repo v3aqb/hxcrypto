@@ -37,7 +37,7 @@ def encrypt(key: bytes, plain_text: str, method=DEFAULT_METHOD) -> str:
         plain_text = plain_text_zip
         zip_flag = 1
     plain_text = chr(zip_flag).encode('latin1') + plain_text
-    crypto = AEncryptor(key, method, CTX)
+    crypto = AEncryptor(key, method, CTX, check_iv=False)
     cipher_text = crypto.encrypt(plain_text)
     return base64.urlsafe_b64encode(cipher_text).decode()
 
@@ -48,7 +48,7 @@ def decrypt(key: bytes, cipher_text: str) -> str:
 
     method = DEFAULT_METHOD
     cipher_text = base64.urlsafe_b64decode(cipher_text.encode())
-    crypto = AEncryptor(key, method, CTX)
+    crypto = AEncryptor(key, method, CTX, check_iv=False)
     plain_text = crypto.decrypt(cipher_text)
     if plain_text[0] == 1:
         plain_text = zlib.decompress(plain_text[1:])
