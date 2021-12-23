@@ -1,5 +1,6 @@
 
 import time
+import base64
 
 from PyQt5 import QtWidgets, QtCore
 
@@ -35,6 +36,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.ui.PSKencryptButton.clicked.connect(self.pskencrypt)
         self.ui.PSKdecryptButton.clicked.connect(self.pskdecrypt)
+
+        self.ui.b64EncodeButton.clicked.connect(self.b64encode)
+        self.ui.b64DecodeButton.clicked.connect(self.b64decode)
 
         self.resetPrivate()
         self.show()
@@ -169,3 +173,23 @@ class MainWindow(QtWidgets.QMainWindow):
             return
 
         self._last_active = time.time()
+
+    def b64decode(self):
+        text = self.ui.b64TextEdit.toPlainText()
+        text_bytes = text.encode('utf-8')
+        try:
+            result = base64.urlsafe_b64decode(text_bytes).decode()
+            self.ui.b64TextEdit.setPlainText(result)
+        except Exception as err:
+            self.statusBar().showMessage(repr(err), 5000)
+            return
+
+    def b64encode(self):
+        text = self.ui.b64TextEdit.toPlainText()
+        text_bytes = text.encode('utf-8')
+        try:
+            result = base64.urlsafe_b64encode(text_bytes).decode()
+            self.ui.b64TextEdit.setPlainText(result)
+        except Exception as err:
+            self.statusBar().showMessage(repr(err), 5000)
+            return
