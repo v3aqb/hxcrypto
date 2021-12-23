@@ -123,7 +123,7 @@
          </widget>
         </item>
         <item>
-         <widget class="QTextEdit" name="textEdit">
+         <widget class="QPlainTextEdit" name="textEdit">
           <property name="sizePolicy">
            <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
             <horstretch>0</horstretch>
@@ -175,7 +175,7 @@
          </widget>
         </item>
         <item>
-         <widget class="QTextEdit" name="psktextEdit"/>
+         <widget class="QPlainTextEdit" name="psktextEdit"/>
         </item>
         <item>
          <layout class="QHBoxLayout" name="horizontalLayout_2">
