@@ -203,12 +203,24 @@ def get_cipher(key, method, op_, iv_):
     return cipher.encryptor() if op_ else cipher.decryptor()
 
 
+class DummyIVChecker(object):
+    def __init__(self):
+        pass
+
+    def check(self, key, iv_):
+        pass
+
+
 class EncryptorStream(object):
-    def __init__(self, password, method):
+    def __init__(self, password, method, check_iv=True):
         if method not in METHOD_SUPPORTED:
             raise ValueError('encryption method not supported')
         if not isinstance(password, bytes):
             password = password.encode('utf8')
+        if check_iv:
+            self.iv_checker = iv_checker
+        else:
+            self.iv_checker = DummyIVChecker()
 
         self.method = method
         self.key_len, self.iv_len, _aead = METHOD_SUPPORTED.get(method)
@@ -233,7 +245,7 @@ class EncryptorStream(object):
                 else:
                     iv_ = random_string(self._iv_len)
                 try:
-                    iv_checker.check(self.__key, iv_)
+                    self.iv_checker.check(self.__key, iv_)
                 except IVError:
                     continue
                 break
@@ -248,7 +260,7 @@ class EncryptorStream(object):
             raise BufEmptyError
         if self._decryptor is None:
             iv_ = data[:self._iv_len]
-            iv_checker.check(self.__key, iv_)
+            self.iv_checker.check(self.__key, iv_)
             self._decryptor = get_cipher(self.__key, self.method, 0, iv_)
             data = data[self._iv_len:]
             if not data:
@@ -256,11 +268,11 @@ class EncryptorStream(object):
         return self._decryptor.update(data)
 
 
-def Encryptor(password, method):
+def Encryptor(password, method, check_iv=True):
     '''return shadowsocks Encryptor'''
     if is_aead(method):
-        return AEncryptorAEAD(password, method, SS_SUBKEY)
-    return EncryptorStream(password, method)
+        return AEncryptorAEAD(password, method, SS_SUBKEY, check_iv)
+    return EncryptorStream(password, method, check_iv)
 
 
 def AEncryptor(key, method, ctx, check_iv=True):
@@ -302,7 +314,10 @@ class AEncryptorAEAD(object):
 
         self._ctx = ctx  # SUBKEY_INFO
         self.__key = key
-        self.check_iv = check_iv
+        if check_iv:
+            self.iv_checker = iv_checker
+        else:
+            self.iv_checker = DummyIVChecker()
 
         if self._ctx == SS_SUBKEY:
             self.encrypt = self.encrypt_ss
@@ -363,7 +378,7 @@ class AEncryptorAEAD(object):
                 else:
                     iv_ = random_string(self._iv_len)
                 try:
-                    iv_checker.check(self.__key, iv_)
+                    self.iv_checker.check(self.__key, iv_)
                 except IVError:
                     continue
                 break
@@ -389,8 +404,7 @@ class AEncryptorAEAD(object):
 
         if self._decryptor is None:
             iv_, data = data[:self._iv_len], data[self._iv_len:]
-            if self.check_iv:
-                iv_checker.check(self.__key, iv_)
+            self.iv_checker.check(self.__key, iv_)
             _decryptor_skey = self.key_expand(self.__key, iv_)
             self._decryptor = get_aead_cipher(_decryptor_skey, self.method)
 

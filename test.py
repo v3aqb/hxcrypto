@@ -3,17 +3,17 @@ import os
 import time
 import traceback
 
-from hxcrypto import encrypt, Encryptor, is_aead, method_supported, AEncryptor
+from hxcrypto import Encryptor, is_aead, method_supported, AEncryptor
 
 
 def test_one(method):
     data = os.urandom(10240)
     if is_aead(method):
-        cipher = AEncryptor(b'123456', method, b"ctx")
-        cipher1 = AEncryptor(b'123456', method, b"ctx")
+        cipher = AEncryptor(b'123456', method, b"ctx", check_iv=False)
+        cipher1 = AEncryptor(b'123456', method, b"ctx", check_iv=False)
     else:
-        cipher = Encryptor(b'123456', method)
-        cipher1 = Encryptor(b'123456', method)
+        cipher = Encryptor(b'123456', method, check_iv=False)
+        cipher1 = Encryptor(b'123456', method, check_iv=False)
     ct1 = cipher.encrypt(data)
     cipher1.decrypt(ct1)
     time_log = time.time()
@@ -26,17 +26,6 @@ def test_one(method):
 
 
 def test():
-    # disable ivchecker
-    class DummyIVChecker(object):
-        '''DummyIVChecker'''
-        def __init__(self, size, timeout):
-            pass
-
-        def check(self, key, iv):
-            pass
-
-    encrypt.IV_CHECKER = DummyIVChecker(1, 1)
-
     print('encrypt and decrypt 20MB data.')
 
     lst = sorted(method_supported.keys())
@@ -53,17 +42,6 @@ def test():
 
 
 def test_for_result():
-    # disable ivchecker
-    class DummyIVChecker(object):
-        '''DummyIVChecker'''
-        def __init__(self, size, timeout):
-            pass
-
-        def check(self, key, iv):
-            pass
-
-    encrypt.IV_CHECKER = DummyIVChecker(1, 1)
-
     result = []
     result.append('encrypt and decrypt 20MB data.')
 
