@@ -49,8 +49,8 @@ class IVStore(object):
 
     def __init__(self, maxlen):
         self.maxlen = maxlen
-        self.store_0 = BloomFilter(self.maxlen, 0.001)
-        self.store_1 = BloomFilter(self.maxlen, 0.001)
+        self.store_0 = BloomFilter(self.maxlen, 0.0001)
+        self.store_1 = BloomFilter(self.maxlen, 0.0001)
 
     def add(self, item):
         if item in self:
