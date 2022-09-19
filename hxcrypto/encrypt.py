@@ -90,37 +90,42 @@ def check(key, method_):
 
 
 METHOD_SUPPORTED = {
-    # 'id': (key_len, ivlen, is_aead)
+    # 'id': (key_len, ivlen/salt, is_aead)
     'aes-128-cfb': (16, 16, False),
     'aes-192-cfb': (24, 16, False),
     'aes-256-cfb': (32, 16, False),
-    'aes-128-ofb': (16, 16, False),
-    'aes-192-ofb': (24, 16, False),
-    'aes-256-ofb': (32, 16, False),
+    # 'aes-128-ofb': (16, 16, False),
+    # 'aes-192-ofb': (24, 16, False),
+    # 'aes-256-ofb': (32, 16, False),
     'aes-128-ctr': (16, 16, False),
     'aes-192-ctr': (24, 16, False),
     'aes-256-ctr': (32, 16, False),
     'camellia-128-cfb': (16, 16, False),
     'camellia-192-cfb': (24, 16, False),
     'camellia-256-cfb': (32, 16, False),
-    'camellia-128-ofb': (16, 16, False),
-    'camellia-192-ofb': (24, 16, False),
-    'camellia-256-ofb': (32, 16, False),
-    'camellia-128-ctr': (16, 16, False),
-    'camellia-192-ctr': (24, 16, False),
-    'camellia-256-ctr': (32, 16, False),
+    # 'camellia-128-ofb': (16, 16, False),
+    # 'camellia-192-ofb': (24, 16, False),
+    # 'camellia-256-ofb': (32, 16, False),
+    # 'camellia-128-ctr': (16, 16, False),
+    # 'camellia-192-ctr': (24, 16, False),
+    # 'camellia-256-ctr': (32, 16, False),
     'rc4-md5': (16, 16, False),
     'chacha20-ietf': (32, 12, False),
     # 'bypass': (16, 16, False),  # for testing only
     'aes-128-gcm': (16, 16, True),
-    'aes-192-gcm': (24, 24, True),
     'aes-256-gcm': (32, 32, True),
+    # 'aes-128-ccm': (16, 16, True),
+    # 'aes-256-ccm': (32, 32, True),
+    # 'aes-128-ocb-taglen128': (16, 16, True),
+    # 'aes-256-ocb-taglen128': (32, 32, True),
     'chacha20-ietf-poly1305': (32, 32, True),
 }
 
 
 def is_aead(method_):
     '''return if method_ is AEAD'''
+    if method_ not in METHOD_SUPPORTED:
+        return False
     return METHOD_SUPPORTED.get(method_)[2]
 
 
@@ -290,7 +295,12 @@ def get_aead_cipher(key, method):
     '''get_aead_cipher
        method should be AEAD method'''
     if method.startswith('aes'):
-        return aead.AESGCM(key)
+        if method.endswith('gcm'):
+            return aead.AESGCM(key)
+        if method.endswith('ccm'):
+            return aead.AESCCM(key)
+        if 'ocb' in method:
+            return aead.AESOCB3(key)
     return aead.ChaCha20Poly1305(key)
 
 
