@@ -13,8 +13,8 @@ def test_one(method, block, repeat):
     data = os.urandom(block)
 
     if is_aead(method):
-        cipher = AEncryptor(b'123456', method, b"ctx", check_iv=False)
-        cipher1 = AEncryptor(b'123456', method, b"ctx", check_iv=False)
+        cipher = AEncryptor(b'cXdlcg==', method, b"ctx", check_iv=False)
+        cipher1 = AEncryptor(b'cXdlcg==', method, b"ctx", check_iv=False)
     else:
         cipher = Encryptor(b'123456', method, check_iv=False)
         cipher1 = Encryptor(b'123456', method, check_iv=False)

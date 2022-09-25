@@ -2,7 +2,7 @@
 # coding: UTF-8
 #
 
-# Copyright (c) 2013-2019 v3aqb
+# Copyright (c) 2013-2022 v3aqb
 
 # This file is part of hxcrypto.
 
@@ -45,6 +45,8 @@
 
 import os
 import sys
+import time
+import base64
 import hashlib
 import struct
 
@@ -54,8 +56,13 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
 
 from .iv_checker import iv_checker, IVError
+try:
+    from blake3 import blake3
+except ImportError:
+    blake3 = None
 
-SS_SUBKEY = b"ss-subkey"
+SS_SUBKEY = "ss-subkey"
+SS_SUBKEY_2022 = 'shadowsocks 2022 session subkey'
 
 
 class BufEmptyError(ValueError):
@@ -121,6 +128,12 @@ METHOD_SUPPORTED = {
     # 'aes-256-ocb-taglen128': (32, 32, True),
     'chacha20-ietf-poly1305': (32, 32, True),
 }
+
+if blake3:
+    METHOD_SUPPORTED.update({'2022-blake3-aes-128-gcm': (16, 16, True),
+                             '2022-blake3-aes-256-gcm': (32, 32, True),
+                             '2022-blake3-chacha20-ietf-poly1305': (32, 32, True),
+                             })
 
 
 def is_aead(method_):
@@ -236,7 +249,7 @@ class EncryptorStream(object):
         self._decryptor = None
         self.encrypt_once = self.encrypt
 
-    def encrypt(self, data):
+    def encrypt(self, data, role=0):
         if not data:
             raise BufEmptyError
         if not self._encryptor:
@@ -276,7 +289,8 @@ class EncryptorStream(object):
 def Encryptor(password, method, check_iv=True):
     '''return shadowsocks Encryptor'''
     if is_aead(method):
-        return AEncryptorAEAD(password, method, SS_SUBKEY, check_iv)
+        subkey = SS_SUBKEY_2022 if method.startswith('2022') else SS_SUBKEY
+        return AEncryptorAEAD(password, method, subkey, check_iv)
     return EncryptorStream(password, method, check_iv)
 
 
@@ -294,7 +308,7 @@ if sys.version_info[0] == 3:
 def get_aead_cipher(key, method):
     '''get_aead_cipher
        method should be AEAD method'''
-    if method.startswith('aes'):
+    if 'aes' in method:
         if method.endswith('gcm'):
             return aead.AESGCM(key)
         if method.endswith('ccm'):
@@ -305,6 +319,8 @@ def get_aead_cipher(key, method):
 
 
 def key_expand(key, salt, ctx, key_len):
+    if ctx == SS_SUBKEY_2022:
+        return blake3(key + salt, derive_key_context=ctx).digest()[:key_len]
     algo = hashes.SHA1() if ctx == SS_SUBKEY else hashes.SHA256()
     if not isinstance(ctx, bytes):
         ctx = ctx.encode()
@@ -335,14 +351,17 @@ class AEncryptorAEAD(object):
 
         self.method = method
 
-        self._ctx = ctx  # SUBKEY_INFO
+        self.ctx = ctx  # SUBKEY_INFO
         self.__key = key
 
         self.iv_checker = iv_checker if check_iv else DummyIVChecker()
 
-        if self._ctx == SS_SUBKEY:
+        if self.ctx == SS_SUBKEY:
             self.encrypt = self.encrypt_ss
             self.__key = EVP_BytesToKey(key, self.key_len)
+        elif self.ctx == SS_SUBKEY_2022:
+            self.encrypt = self.encrypt_ss
+            self.__key = base64.b64decode(key)
         else:
             self.encrypt = self._encrypt
         self.encrypt_once = self._encrypt
@@ -373,11 +392,11 @@ class AEncryptorAEAD(object):
 
         if not self._encryptor:
             _len = len(data) + self._iv_len + self.TAG_LEN - 2
-            if self._ctx == SS_SUBKEY:
+            if self.ctx in (SS_SUBKEY, SS_SUBKEY_2022):
                 _len += self.TAG_LEN + data_len
 
             for _ in range(5):
-                if self._ctx == SS_SUBKEY and _len <= 65535:
+                if self.ctx == SS_SUBKEY and _len <= 65535:
                     iv_ = struct.pack(">H", _len) + random_string(self._iv_len - 2)
                 else:
                     iv_ = random_string(self._iv_len)
@@ -388,7 +407,7 @@ class AEncryptorAEAD(object):
                 break
             else:
                 raise IVError("unable to create iv")
-            _encryptor_skey = key_expand(self.__key, iv_, self._ctx, self.key_len)
+            _encryptor_skey = key_expand(self.__key, iv_, self.ctx, self.key_len)
             self._encryptor = get_aead_cipher(_encryptor_skey, self.method)
             cipher_text = self._encryptor.encrypt(nonce, data, associated_data)
             cipher_text = iv_ + cipher_text
@@ -397,8 +416,21 @@ class AEncryptorAEAD(object):
 
         return cipher_text
 
-    def encrypt_ss(self, data):
-        ct1 = self._encrypt(struct.pack("!H", len(data)), data_len=len(data))
+    def encrypt_ss(self, data, role=0):
+        '''
+        role==1: HeaderTypeServerStream
+        '''
+        if not self._encryptor and self.ctx == SS_SUBKEY_2022:
+            if role:
+                header = b'\1' + struct.pack("!Q", int(time.time()))
+                header += self._decryptor_iv + struct.pack("!H", len(data))
+                ct1 = self._encrypt(header, data_len=len(data))
+            else:
+                header = b'\0' + struct.pack("!Q", int(time.time()))
+                header += struct.pack("!H", len(data))
+                ct1 = self._encrypt(header, data_len=len(data))
+        else:
+            ct1 = self._encrypt(struct.pack("!H", len(data)), data_len=len(data))
         ct2 = self._encrypt(data)
         return ct1 + ct2
 
@@ -409,7 +441,7 @@ class AEncryptorAEAD(object):
         if self._decryptor is None:
             self._decryptor_iv, data = data[:self._iv_len], data[self._iv_len:]
             self.iv_checker.check(self.__key, self._decryptor_iv)
-            _decryptor_skey = key_expand(self.__key, self._decryptor_iv, self._ctx, self.key_len)
+            _decryptor_skey = key_expand(self.__key, self._decryptor_iv, self.ctx, self.key_len)
             self._decryptor = get_aead_cipher(_decryptor_skey, self.method)
 
         if not data:
