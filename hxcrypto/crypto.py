@@ -178,8 +178,9 @@ class MainWindow(QtWidgets.QMainWindow):
         text = self.ui.b64TextEdit.toPlainText()
         text_bytes = text.encode('utf-8')
         try:
-            result = base64.urlsafe_b64decode(text_bytes).decode()
-            self.ui.b64TextEdit.setPlainText(result)
+            result = base64.b64decode(text_bytes).decode()
+            if result:
+                self.ui.b64TextEdit.setPlainText(result)
         except Exception as err:
             self.statusBar().showMessage(repr(err), 5000)
             return
@@ -188,7 +189,7 @@ class MainWindow(QtWidgets.QMainWindow):
         text = self.ui.b64TextEdit.toPlainText()
         text_bytes = text.encode('utf-8')
         try:
-            result = base64.urlsafe_b64encode(text_bytes).decode()
+            result = base64.b64encode(text_bytes).decode()
             self.ui.b64TextEdit.setPlainText(result)
         except Exception as err:
             self.statusBar().showMessage(repr(err), 5000)
