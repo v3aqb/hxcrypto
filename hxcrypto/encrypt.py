@@ -47,10 +47,11 @@ import os
 import sys
 import hashlib
 import struct
-import hmac
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes, aead
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.hazmat.primitives import hashes
 
 from .iv_checker import iv_checker, IVError
 
@@ -69,19 +70,19 @@ def random_string(size):
 def EVP_BytesToKey(password, key_len):
     ''' equivalent to OpenSSL's EVP_BytesToKey() with count 1
         so that we make the same key and iv as nodejs version'''
-    m_list = []
-    _len = 0
-
-    while _len < key_len:
+    if not isinstance(password, bytes):
+        password = password.encode('utf8')
+    temp = b''
+    output = b''
+    while len(output) < key_len:
         md5 = hashlib.md5()
         data = password
-        if m_list:
-            data = m_list[len(m_list) - 1] + password
+        if temp:
+            data = temp + password
         md5.update(data)
-        m_list.append(md5.digest())
-        _len += 16
-    key = b''.join(m_list)
-    return key[:key_len]
+        temp = md5.digest()
+        output += temp
+    return output[:key_len]
 
 
 def check(key, method_):
@@ -90,7 +91,7 @@ def check(key, method_):
 
 
 METHOD_SUPPORTED = {
-    # 'id': (key_len, ivlen/salt, is_aead)
+    # 'id': (key_len, iv/salt_len, is_aead)
     'aes-128-cfb': (16, 16, False),
     'aes-192-cfb': (24, 16, False),
     'aes-256-cfb': (32, 16, False),
@@ -220,12 +221,8 @@ class EncryptorStream(object):
     def __init__(self, password, method, check_iv=True):
         if method not in METHOD_SUPPORTED:
             raise ValueError('encryption method not supported')
-        if not isinstance(password, bytes):
-            password = password.encode('utf8')
-        if check_iv:
-            self.iv_checker = iv_checker
-        else:
-            self.iv_checker = DummyIVChecker()
+
+        self.iv_checker = iv_checker if check_iv else DummyIVChecker()
 
         self.method = method
         self.key_len, self.iv_len, _aead = METHOD_SUPPORTED.get(method)
@@ -304,6 +301,19 @@ def get_aead_cipher(key, method):
     return aead.ChaCha20Poly1305(key)
 
 
+def key_expand(key, salt, ctx, key_len):
+    algo = hashes.SHA1() if ctx == SS_SUBKEY else hashes.SHA256()
+    if not isinstance(ctx, bytes):
+        ctx = ctx.encode()
+    hkdf = HKDF(algorithm=algo,
+                length=key_len,
+                salt=salt,
+                info=ctx,
+                )
+    key = hkdf.derive(key)
+    return key
+
+
 class AEncryptorAEAD(object):
     '''
     Provide Authenticated Encryption, compatible with shadowsocks AEAD mode.
@@ -324,15 +334,11 @@ class AEncryptorAEAD(object):
 
         self._ctx = ctx  # SUBKEY_INFO
         self.__key = key
-        if check_iv:
-            self.iv_checker = iv_checker
-        else:
-            self.iv_checker = DummyIVChecker()
+
+        self.iv_checker = iv_checker if check_iv else DummyIVChecker()
 
         if self._ctx == SS_SUBKEY:
             self.encrypt = self.encrypt_ss
-            if not isinstance(key, bytes):
-                key = key.encode('utf8')
             self.__key = EVP_BytesToKey(key, self.key_len)
         else:
             self.encrypt = self._encrypt
@@ -343,22 +349,7 @@ class AEncryptorAEAD(object):
 
         self._decryptor = None
         self._decryptor_nonce = 0
-
-    def key_expand(self, key, iv):
-        algo = hashlib.sha1 if self._ctx == SS_SUBKEY else hashlib.sha256
-        prk = hmac.new(iv, key, algo).digest()
-
-        hash_len = algo().digest_size
-        blocks_needed = self.key_len // hash_len + (1 if self.key_len % hash_len else 0)  # ceil
-        okm = b""
-        output_block = b""
-        for counter in range(blocks_needed):
-            output_block = hmac.new(prk,
-                                    buffer(output_block + self._ctx + bytearray((counter + 1,))),
-                                    algo
-                                    ).digest()
-            okm += output_block
-        return okm[:self.key_len]
+        self._decryptor_iv = None
 
     def _encrypt(self, data, associated_data=None, data_len=0):
         '''
@@ -394,7 +385,7 @@ class AEncryptorAEAD(object):
                 break
             else:
                 raise IVError("unable to create iv")
-            _encryptor_skey = self.key_expand(self.__key, iv_)
+            _encryptor_skey = key_expand(self.__key, iv_, self._ctx, self.key_len)
             self._encryptor = get_aead_cipher(_encryptor_skey, self.method)
             cipher_text = self._encryptor.encrypt(nonce, data, associated_data)
             cipher_text = iv_ + cipher_text
@@ -413,9 +404,9 @@ class AEncryptorAEAD(object):
             raise BufEmptyError
 
         if self._decryptor is None:
-            iv_, data = data[:self._iv_len], data[self._iv_len:]
-            self.iv_checker.check(self.__key, iv_)
-            _decryptor_skey = self.key_expand(self.__key, iv_)
+            self._decryptor_iv, data = data[:self._iv_len], data[self._iv_len:]
+            self.iv_checker.check(self.__key, self._decryptor_iv)
+            _decryptor_skey = key_expand(self.__key, self._decryptor_iv, self._ctx, self.key_len)
             self._decryptor = get_aead_cipher(_decryptor_skey, self.method)
 
         if not data:
