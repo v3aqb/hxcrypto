@@ -112,7 +112,7 @@ METHOD_SUPPORTED = {
     # 'camellia-256-ctr': (32, 16, False),
     'rc4-md5': (16, 16, False),
     'chacha20-ietf': (32, 12, False),
-    # 'bypass': (16, 16, False),  # for testing only
+    'none': (0, 0, False),  # for testing only
     'aes-128-gcm': (16, 16, True),
     'aes-256-gcm': (32, 32, True),
     # 'aes-128-ccm': (16, 16, True),
@@ -130,14 +130,14 @@ def is_aead(method_):
     return METHOD_SUPPORTED.get(method_)[2]
 
 
-# class bypass(object):
-#     '''dummy stream cipher'''
-#     def __init__(self):
-#         pass
+class plain(object):
+    '''dummy stream cipher'''
+    def __init__(self):
+        pass
 
-#     def update(self, buf):
-#         '''fake encrypt / decrypt'''
-#         return buf
+    def update(self, buf):
+        '''fake encrypt / decrypt'''
+        return buf
 
 
 class Chacha20IETF(object):
@@ -174,8 +174,8 @@ class Chacha20IETF(object):
 
 def get_cipher(key, method, op_, iv_):
     '''get stream cipher'''
-    # if method == 'bypass':
-    #     return bypass()
+    if method == 'none':
+        return plain()
     if method == 'rc4-md5':
         md5 = hashlib.md5()
         md5.update(key)
@@ -241,6 +241,9 @@ class EncryptorStream(object):
             raise BufEmptyError
         if not self._encryptor:
             for _ in range(5):
+                if not self._iv_len:
+                    iv_ = b''
+                    break
                 _len = len(data) + self._iv_len - 2
                 if _len <= 65535:
                     iv_ = struct.pack(">H", _len) + random_string(self._iv_len - 2)
@@ -259,7 +262,7 @@ class EncryptorStream(object):
 
     def decrypt(self, data):
         if not data:
-            raise BufEmptyError
+            return b''
         if self._decryptor is None:
             iv_ = data[:self._iv_len]
             self.iv_checker.check(self.__key, iv_)

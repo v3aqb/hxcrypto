@@ -77,7 +77,8 @@ class IVChecker(object):
         self.store = defaultdict(lambda: IVStore(maxlen))
 
     def check(self, key, iv):
-        self.store[key].add(iv)
+        if iv:
+            self.store[key].add(iv)
 
 
 iv_checker = IVChecker()
