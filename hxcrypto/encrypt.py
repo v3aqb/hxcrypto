@@ -440,12 +440,16 @@ class AEncryptorAEAD(object):
 
         if self._decryptor is None:
             self._decryptor_iv, data = data[:self._iv_len], data[self._iv_len:]
-            self.iv_checker.check(self.__key, self._decryptor_iv)
             _decryptor_skey = key_expand(self.__key, self._decryptor_iv, self.ctx, self.key_len)
             self._decryptor = get_aead_cipher(_decryptor_skey, self.method)
-
+            nonce = struct.pack('<Q', self._decryptor_nonce) + b'\x00\x00\x00\x00'
+            self._decryptor_nonce += 1
+            buf = self._decryptor.decrypt(nonce, data, associated_data)
+            self.iv_checker.check(self.__key, self._decryptor_iv)
+            return buf
         if not data:
             return b''
         nonce = struct.pack('<Q', self._decryptor_nonce) + b'\x00\x00\x00\x00'
         self._decryptor_nonce += 1
-        return self._decryptor.decrypt(nonce, data, associated_data)
+        buf = self._decryptor.decrypt(nonce, data, associated_data)
+        return buf
