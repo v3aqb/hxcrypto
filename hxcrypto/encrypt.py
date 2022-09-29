@@ -243,6 +243,7 @@ class EncryptorStream(object):
         if _aead:
             raise ValueError('AEAD method is not supported by Encryptor class!')
 
+        self.ctx = None
         self.__key = EVP_BytesToKey(password, self.key_len)
 
         self._encryptor = None
