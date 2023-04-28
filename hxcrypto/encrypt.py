@@ -48,6 +48,7 @@ import sys
 import time
 import base64
 import hashlib
+import random
 import struct
 
 from cryptography.hazmat.backends import default_backend
@@ -64,9 +65,27 @@ except ImportError:
 SS_SUBKEY = "ss-subkey"
 SS_SUBKEY_2022 = 'shadowsocks 2022 session subkey'
 
+EXEMPT_LIST = [
+    b'\x16\x03\x02',
+    b'\x16\x03\x03',
+    b'GET /',
+    b'POST /',
+    b'HEAD /',
+]
+
 
 class BufEmptyError(ValueError):
     '''BufEmptyError'''
+
+
+def random_string_ss(size):
+    if random.random() < 0.3:
+        init = random.choice(EXEMPT_LIST)
+    elif random.random() < 0.5:
+        init = base64.b64encode(random_string(6))
+    else:
+        init = base64.b85encode(random_string(size))[:size]
+    return init + random_string(size - len(init))
 
 
 def random_string(size):
@@ -231,11 +250,12 @@ class DummyIVChecker(object):
 
 
 class EncryptorStream(object):
-    def __init__(self, password, method, check_iv=True):
+    def __init__(self, password, method, check_iv=True, role=2):
         if method not in METHOD_SUPPORTED:
             raise ValueError('encryption method not supported')
 
         self.iv_checker = iv_checker if check_iv else DummyIVChecker()
+        self.role = role  # 0 for ss-client, 1 for ss-server, 2 for plain
 
         self.method = method
         self.key_len, self.iv_len, _aead = METHOD_SUPPORTED.get(method)
@@ -250,7 +270,7 @@ class EncryptorStream(object):
         self._decryptor = None
         self.encrypt_once = self.encrypt
 
-    def encrypt(self, data, role=0):
+    def encrypt(self, data):
         if not data:
             raise BufEmptyError
         if not self._encryptor:
@@ -258,9 +278,10 @@ class EncryptorStream(object):
                 if not self._iv_len:
                     iv_ = b''
                     break
-                _len = len(data) + self._iv_len - 2
-                if _len <= 65535:
-                    iv_ = struct.pack(">H", _len) + random_string(self._iv_len - 2)
+                if self.role == 0:
+                    iv_ = random_string_ss(self._iv_len)
+                elif self.role == 1:
+                    iv_ = struct.pack(">H", len(data) + self._iv_len - 2) + random_string(self._iv_len - 2)
                 else:
                     iv_ = random_string(self._iv_len)
                 try:
@@ -287,18 +308,18 @@ class EncryptorStream(object):
         return self._decryptor.update(data)
 
 
-def Encryptor(password, method, check_iv=True):
+def Encryptor(password, method, check_iv=True, role=2):
     '''return shadowsocks Encryptor'''
     if is_aead(method):
         subkey = SS_SUBKEY_2022 if method.startswith('2022') else SS_SUBKEY
-        return AEncryptorAEAD(password, method, subkey, check_iv)
-    return EncryptorStream(password, method, check_iv)
+        return AEncryptorAEAD(password, method, subkey, check_iv, role)
+    return EncryptorStream(password, method, check_iv, role)
 
 
-def AEncryptor(key, method, ctx, check_iv=True):
+def AEncryptor(key, method, ctx, check_iv=True, role=2):
     if not is_aead(method):
         method = 'chacha20-ietf-poly1305'
-    return AEncryptorAEAD(key, method, ctx, check_iv)
+    return AEncryptorAEAD(key, method, ctx, check_iv, role)
 
 
 if sys.version_info[0] == 3:
@@ -341,10 +362,11 @@ class AEncryptorAEAD(object):
     NONCE_LEN = 12
     TAG_LEN = 16
 
-    def __init__(self, key, method, ctx, check_iv=True):
+    def __init__(self, key, method, ctx, check_iv=True, role=2):
         if method not in METHOD_SUPPORTED:
             raise ValueError('encryption method not supported')
 
+        self.role = role
         self.key_len, self.iv_len, _aead = METHOD_SUPPORTED.get(method)
         self._key_len, self._iv_len = self.key_len, self.iv_len  # for backword compatible
         if not _aead:
@@ -384,7 +406,6 @@ class AEncryptorAEAD(object):
         +--------------+------------+
         for shadowsocks AEAD, this method must be called twice:
         first encrypt Data_Len, then encrypt Data
-
         '''
         if not data:
             raise BufEmptyError
@@ -397,8 +418,11 @@ class AEncryptorAEAD(object):
                 _len += self.TAG_LEN + data_len
 
             for _ in range(5):
-                if self.ctx == SS_SUBKEY and _len <= 65535:
-                    iv_ = struct.pack(">H", _len) + random_string(self._iv_len - 2)
+                if self.ctx in (SS_SUBKEY, SS_SUBKEY_2022):
+                    if self.role == 0:
+                        iv_ = random_string_ss(self._iv_len)
+                    else:
+                        iv_ = struct.pack(">H", _len) + random_string(self._iv_len - 2)
                 else:
                     iv_ = random_string(self._iv_len)
                 try:
@@ -417,16 +441,13 @@ class AEncryptorAEAD(object):
 
         return cipher_text
 
-    def encrypt_ss(self, data, role=0):
-        '''
-        role==1: HeaderTypeServerStream
-        '''
+    def encrypt_ss(self, data):
         if not self._encryptor and self.ctx == SS_SUBKEY_2022:
-            if role:
+            if self.role:  # server
                 header = b'\1' + struct.pack("!Q", int(time.time()))
                 header += self._decryptor_iv + struct.pack("!H", len(data))
                 ct1 = self._encrypt(header, data_len=len(data))
-            else:
+            else:  # client
                 header = b'\0' + struct.pack("!Q", int(time.time()))
                 header += struct.pack("!H", len(data))
                 ct1 = self._encrypt(header, data_len=len(data))
