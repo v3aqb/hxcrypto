@@ -461,17 +461,19 @@ class AEncryptorAEAD(object):
             raise BufEmptyError
 
         if self._decryptor is None:
-            self._decryptor_iv, data = data[:self._iv_len], data[self._iv_len:]
-            _decryptor_skey = key_expand(self.__key, self._decryptor_iv, self.ctx, self.key_len)
-            self._decryptor = get_aead_cipher(_decryptor_skey, self.method)
+            _decryptor_iv, data = data[:self._iv_len], data[self._iv_len:]
+            _decryptor_skey = key_expand(self.__key, _decryptor_iv, self.ctx, self.key_len)
+            _decryptor = get_aead_cipher(_decryptor_skey, self.method)
             nonce = struct.pack('<Q', self._decryptor_nonce) + b'\x00\x00\x00\x00'
+            buf = _decryptor.decrypt(nonce, data, associated_data)
+            self._decryptor = _decryptor
+            self._decryptor_iv = _decryptor_iv
             self._decryptor_nonce += 1
-            buf = self._decryptor.decrypt(nonce, data, associated_data)
             self.iv_checker.check(self.__key, self._decryptor_iv)
             return buf
         if not data:
             return b''
         nonce = struct.pack('<Q', self._decryptor_nonce) + b'\x00\x00\x00\x00'
-        self._decryptor_nonce += 1
         buf = self._decryptor.decrypt(nonce, data, associated_data)
+        self._decryptor_nonce += 1
         return buf
