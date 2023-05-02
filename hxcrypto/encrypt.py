@@ -84,7 +84,7 @@ def random_string_ss(size):
     elif random.random() < 0.5:
         init = base64.b64encode(random_string(6))
     else:
-        init = base64.b85encode(random_string(size))[:size]
+        init = base64.b64encode(random_string(size))[:size]
     return init + random_string(size - len(init))
 
 
