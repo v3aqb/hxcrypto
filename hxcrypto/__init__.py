@@ -25,6 +25,7 @@ from hmac import compare_digest
 from cryptography.exceptions import InvalidSignature, InvalidTag
 
 from .encrypt import BufEmptyError, is_aead, Encryptor, AEncryptor, IVError
+from .encrypt import SS_SUBKEY, SS_SUBKEY_2022
 from .encrypt import METHOD_SUPPORTED as method_supported
 from .ecc import Ecc
 ECC = Ecc
@@ -40,4 +41,6 @@ __all__ = ['BufEmptyError',
            'Ecc',
            'compare_digest',
            'method_supported',
+           'SS_SUBKEY',
+           'SS_SUBKEY_2022',
            ]
