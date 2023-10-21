@@ -135,6 +135,7 @@ METHOD_SUPPORTED = {
     # 'camellia-192-ctr': (24, 16, False),
     # 'camellia-256-ctr': (32, 16, False),
     'rc4-md5': (16, 16, False),
+    'rc4': (16, 0, False),
     'chacha20-ietf': (32, 12, False),
     'none': (0, 0, False),  # for testing only
     'aes-128-gcm': (16, 16, True),
