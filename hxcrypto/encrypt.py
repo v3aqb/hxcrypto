@@ -66,8 +66,6 @@ SS_SUBKEY = "ss-subkey"
 SS_SUBKEY_2022 = 'shadowsocks 2022 session subkey'
 
 EXEMPT_LIST = [
-    b'\x16\x03\x02',
-    b'\x16\x03\x03',
     b'GET /',
     b'POST /',
     b'HEAD /',
@@ -280,8 +278,6 @@ class EncryptorStream(object):
                     break
                 if self.role == 0:
                     iv_ = random_string_ss(self._iv_len)
-                elif self.role == 1:
-                    iv_ = struct.pack(">H", len(data) + self._iv_len - 2) + random_string(self._iv_len - 2)
                 else:
                     iv_ = random_string(self._iv_len)
                 try:
@@ -396,7 +392,7 @@ class AEncryptorAEAD(object):
         self._decryptor_nonce = 0
         self._decryptor_iv = None
 
-    def _encrypt(self, data, associated_data=None, data_len=0):
+    def _encrypt(self, data, associated_data=None):
         '''
         TCP Chunk (after encryption, *ciphertext*)
         +--------------+------------+
@@ -413,16 +409,12 @@ class AEncryptorAEAD(object):
         self._encryptor_nonce += 1
 
         if not self._encryptor:
-            _len = len(data) + self._iv_len + self.TAG_LEN - 2
-            if self.ctx in (SS_SUBKEY, SS_SUBKEY_2022):
-                _len += self.TAG_LEN + data_len
-
             for _ in range(5):
                 if self.ctx in (SS_SUBKEY, SS_SUBKEY_2022):
                     if self.role == 0:
                         iv_ = random_string_ss(self._iv_len)
                     else:
-                        iv_ = struct.pack(">H", _len) + random_string(self._iv_len - 2)
+                        iv_ = random_string(self._iv_len)
                 else:
                     iv_ = random_string(self._iv_len)
                 try:
@@ -446,13 +438,13 @@ class AEncryptorAEAD(object):
             if self.role:  # server
                 header = b'\1' + struct.pack("!Q", int(time.time()))
                 header += self._decryptor_iv + struct.pack("!H", len(data))
-                ct1 = self._encrypt(header, data_len=len(data))
+                ct1 = self._encrypt(header)
             else:  # client
                 header = b'\0' + struct.pack("!Q", int(time.time()))
                 header += struct.pack("!H", len(data))
-                ct1 = self._encrypt(header, data_len=len(data))
+                ct1 = self._encrypt(header)
         else:
-            ct1 = self._encrypt(struct.pack("!H", len(data)), data_len=len(data))
+            ct1 = self._encrypt(struct.pack("!H", len(data)))
         ct2 = self._encrypt(data)
         return ct1 + ct2
 
