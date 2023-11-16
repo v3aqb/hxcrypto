@@ -1,6 +1,11 @@
 import os
 import sys
-from PyQt5 import QtGui, QtCore, QtWidgets
+try:
+    from PyQt6 import QtCore, QtWidgets
+    pyqt6 = True
+except ImportError:
+    pyqt6 = False
+    from PyQt5 import QtCore, QtWidgets
 from .crypto import MainWindow
 
 
@@ -19,8 +24,11 @@ def main():
     translator.load(path)
     app.installTranslator(translator)
 
+    if not pyqt6:
+        app.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+        app.setAttribute(QtCore.Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
     ex = MainWindow()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
 
 
 if __name__ == '__main__':

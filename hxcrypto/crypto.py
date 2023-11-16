@@ -3,7 +3,10 @@ import sys
 import time
 import base64
 
-from PyQt5 import QtWidgets, QtCore, QtGui
+try:
+    from PyQt6 import QtWidgets, QtCore, QtGui
+except ImportError:
+    from PyQt5 import QtWidgets, QtCore, QtGui
 
 from hxcrypto import ECC
 from hxcrypto.util import key_to_bytes, encrypt, decrypt
@@ -39,17 +42,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.resetPrivateButton.clicked.connect(self.resetPrivate)
         self.ui.resetExchangeButton.clicked.connect(self.resetExchange)
         self.ui.decryptButton.clicked.connect(self.decrypt)
-        self.ui.textEdit.setWordWrapMode(3)
+        self.ui.textEdit.setWordWrapMode(QtGui.QTextOption.WrapMode.WrapAnywhere)
         self.ui.textEdit.setFont(self.monofont)
 
         self.ui.PSKencryptButton.clicked.connect(self.pskencrypt)
         self.ui.PSKdecryptButton.clicked.connect(self.pskdecrypt)
-        self.ui.psktextEdit.setWordWrapMode(3)
+        self.ui.psktextEdit.setWordWrapMode(QtGui.QTextOption.WrapMode.WrapAnywhere)
         self.ui.psktextEdit.setFont(self.monofont)
         self.ui.pskEdit.setFont(self.monofont)
 
         self.ui.b64EncodeButton.clicked.connect(self.b64encode)
         self.ui.b64DecodeButton.clicked.connect(self.b64decode)
+        self.ui.b64TextEdit.setWordWrapMode(QtGui.QTextOption.WrapMode.WrapAnywhere)
         self.ui.b64TextEdit.setFont(self.monofont)
 
         self.resetPrivate()
