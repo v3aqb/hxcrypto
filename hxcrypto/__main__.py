@@ -11,14 +11,6 @@ def main():
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
     app = QtWidgets.QApplication([])
-    font = QtGui.QFont()
-    if sys.platform.startswith('win'):
-        font.setFamily("Consolas")
-    elif sys.platform.startswith('linux'):
-        font.setFamily("Droid Sans Mono")
-    elif sys.platform.startswith('darwin'):
-        font.setFamily("Menlo")
-    app.setFont(font)
 
     translator = QtCore.QTranslator()
     base_path = os.path.dirname(os.path.realpath(__file__))
