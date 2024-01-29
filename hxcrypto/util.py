@@ -3,7 +3,6 @@ import hashlib
 import base64
 import zlib
 from hxcrypto import AEncryptor
-from hxcrypto import encrypt as _encrypt
 
 CTX = b'v3aqb.hxcrypto'
 SUPPORTED_METHOD = ('aes-256-gcm', 'chacha20-ietf-poly1305')
@@ -18,9 +17,6 @@ class DummyIVChecker:
 
     def check(self, key, iv):
         pass
-
-
-_encrypt.IV_CHECKER = DummyIVChecker(1, 1)
 
 
 def key_to_bytes(key):
