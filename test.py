@@ -16,8 +16,8 @@ def test_one(method, block, repeat):
         cipher = AEncryptor(b'cXdlcg==', method, b"ctx", check_iv=False)
         cipher1 = AEncryptor(b'cXdlcg==', method, b"ctx", check_iv=False)
     else:
-        cipher = Encryptor(b'123456', method, check_iv=False)
-        cipher1 = Encryptor(b'123456', method, check_iv=False)
+        cipher = Encryptor('123456', method, check_iv=False)
+        cipher1 = Encryptor('123456', method, check_iv=False)
     ct1 = cipher.encrypt(data)
     cipher1.decrypt(ct1)
     time_log = time.time()
