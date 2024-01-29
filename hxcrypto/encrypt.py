@@ -51,7 +51,6 @@ import hashlib
 import random
 import struct
 
-from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes, aead
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
@@ -194,7 +193,7 @@ class Chacha20IETF(object):
         nonce = struct.pack("<i", self.counter // 64) + self._iv
 
         algorithm = algorithms.ChaCha20(self._key, nonce)
-        cipher = Cipher(algorithm, mode=None, backend=default_backend())
+        cipher = Cipher(algorithm, mode=None)
         encryptor = cipher.encryptor()
         cipher_text = encryptor.update(data)
 
@@ -227,13 +226,13 @@ def get_cipher(key, method, op_, iv_):
         raise ValueError('operation mode "%s" not supported!' % method.upper())
 
     if method == 'rc4':
-        cipher = Cipher(algorithms.ARC4(key), None, default_backend())
+        cipher = Cipher(algorithms.ARC4(key), None)
     elif method == 'chacha20-ietf':
         return Chacha20IETF(method, key, iv_)
     elif method.startswith('aes'):
-        cipher = Cipher(algorithms.AES(key), mode, default_backend())
+        cipher = Cipher(algorithms.AES(key), mode)
     elif method.startswith('camellia'):
-        cipher = Cipher(algorithms.Camellia(key), mode, default_backend())
+        cipher = Cipher(algorithms.Camellia(key), mode)
     else:
         raise ValueError('crypto algorithm "%s" not supported!' % method.upper())
 

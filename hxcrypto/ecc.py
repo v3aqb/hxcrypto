@@ -24,20 +24,19 @@ This file is part of hxcrypto.
 
 import base64
 import hashlib
-from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives.serialization import load_pem_private_key,\
+from cryptography.hazmat.primitives.serialization import load_pem_private_key, \
     load_der_private_key, load_der_public_key, Encoding, PublicFormat, PrivateFormat, NoEncryption
 
 
-class Ecc(object):
-    curve = {256: ec.SECP521R1,
-             192: ec.SECP384R1,
-             128: ec.SECP256R1,
-             32: ec.SECP521R1,
-             24: ec.SECP384R1,
-             16: ec.SECP256R1,
+class Ecc:
+    curve = {256: ec.SECP521R1(),
+             192: ec.SECP384R1(),
+             128: ec.SECP256R1(),
+             32: ec.SECP521R1(),
+             24: ec.SECP384R1(),
+             16: ec.SECP256R1(),
              }
 
     def __init__(self, key_len=128, from_file=None):
@@ -45,11 +44,11 @@ class Ecc(object):
             with open(from_file, 'rb') as key_file:
                 data = key_file.read()
             if data.startswith(b'-----'):
-                self.ec_private = load_pem_private_key(data, None, backend=default_backend())
+                self.ec_private = load_pem_private_key(data, None)
             else:
-                self.ec_private = load_der_private_key(data, None, backend=default_backend())
+                self.ec_private = load_der_private_key(data, None)
         else:
-            self.ec_private = ec.generate_private_key(self.curve[key_len](), default_backend())
+            self.ec_private = ec.generate_private_key(self.curve[key_len])
         self.ec_public = self.ec_private.public_key()
 
     def get_pub_key(self):
@@ -61,7 +60,7 @@ class Ecc(object):
 
     def get_dh_key(self, other):
         '''ECDH exchange'''
-        peer_public_key = load_der_public_key(other, backend=default_backend())
+        peer_public_key = load_der_public_key(other)
         return self.ec_private.exchange(ec.ECDH(), peer_public_key)
 
     def get_dh_key_b64u(self, other):
@@ -95,13 +94,13 @@ class Ecc(object):
         '''Verify the given digest using ECDSA.
            raise Exception if NOT verified.
         '''
-        pubkey = load_der_public_key(pubkey, backend=default_backend())
+        pubkey = load_der_public_key(pubkey)
         pubkey.verify(signature, data, ec.ECDSA(getattr(hashes, hash_algo)()))
 
     @staticmethod
     def save_pub_key(pubkey, path):
         '''save public key to path'''
-        pubk = load_der_public_key(pubkey, backend=default_backend())
+        pubk = load_der_public_key(pubkey)
         data = pubk.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo)
         with open(path, 'wb') as write_to:
             write_to.write(data)
