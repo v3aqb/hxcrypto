@@ -45,7 +45,7 @@ class IVError(ValueError):
     pass
 
 
-class IVStore(object):
+class IVStore:
 
     def __init__(self, maxlen):
         self.maxlen = maxlen
@@ -68,7 +68,7 @@ class IVStore(object):
         return False
 
 
-class IVChecker(object):
+class IVChecker:
     # check reused iv, removing out-dated data automatically
 
     def __init__(self, maxlen=50000, timeout=3600):

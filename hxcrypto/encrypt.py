@@ -160,7 +160,7 @@ def is_aead(method_):
     return METHOD_SUPPORTED.get(method_)[2]
 
 
-class plain(object):
+class plain:
     '''dummy stream cipher'''
     def __init__(self):
         pass
@@ -170,7 +170,7 @@ class plain(object):
         return buf
 
 
-class Chacha20IETF(object):
+class Chacha20IETF:
     '''chacha20-ietf with python-cryptography'''
     def __init__(self, cipher_name, key, iv):
         self._key = key
@@ -239,7 +239,7 @@ def get_cipher(key, method, op_, iv_):
     return cipher.encryptor() if op_ else cipher.decryptor()
 
 
-class DummyIVChecker(object):
+class DummyIVChecker:
     def __init__(self):
         pass
 
@@ -247,7 +247,7 @@ class DummyIVChecker(object):
         pass
 
 
-class EncryptorStream(object):
+class EncryptorStream:
     def __init__(self, password, method, check_iv=True, role=2):
         if method not in METHOD_SUPPORTED:
             raise ValueError('encryption method not supported')
@@ -351,7 +351,7 @@ def key_expand(key, salt, ctx, key_len):
     return key
 
 
-class AEncryptorAEAD(object):
+class AEncryptorAEAD:
     '''
     Provide Authenticated Encryption, compatible with shadowsocks AEAD mode.
     '''
