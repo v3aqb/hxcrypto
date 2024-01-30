@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name="hxcrypto",
-    version="0.0.5",
+    version="0.0.6",
     license='https://www.gnu.org/licenses/lgpl-3.0.txt',
     description="cryptography module for shadowsocks and hxsocks",
     author='v3aqb',
