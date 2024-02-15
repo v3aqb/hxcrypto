@@ -14,6 +14,15 @@ from hxcrypto.util import key_to_bytes, encrypt, decrypt
 from .ui_crypto import Ui_Crypto
 
 
+b64method = {'Base64': (base64.standard_b64encode, base64.standard_b64decode),
+             'Base64_URLSafe': (base64.urlsafe_b64encode, base64.urlsafe_b64decode),
+             'Base16': (base64.b16encode, base64.b16decode),
+             'Base32': (base64.b32encode, base64.b32decode),
+             'Base32_HEX': (base64.b32hexencode, base64.b32hexdecode),
+             'Base85': (base64.b85encode, base64.b85decode),
+             }
+
+
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -51,6 +60,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.psktextEdit.setFont(self.monofont)
         self.ui.pskEdit.setFont(self.monofont)
 
+        self.ui.b64comboBox.addItems(b64method.keys())
         self.ui.b64EncodeButton.clicked.connect(self.b64encode)
         self.ui.b64DecodeButton.clicked.connect(self.b64decode)
         self.ui.b64TextEdit.setWordWrapMode(QtGui.QTextOption.WrapMode.WrapAnywhere)
@@ -193,8 +203,9 @@ class MainWindow(QtWidgets.QMainWindow):
     def b64decode(self):
         text = self.ui.b64TextEdit.toPlainText()
         text_bytes = text.encode('utf-8')
+        mode = self.ui.b64comboBox.currentText()
         try:
-            result = base64.b64decode(text_bytes).decode()
+            result = b64method[mode][1](text_bytes).decode()
             if result:
                 self.ui.b64TextEdit.setPlainText(result)
         except Exception as err:
@@ -204,8 +215,9 @@ class MainWindow(QtWidgets.QMainWindow):
     def b64encode(self):
         text = self.ui.b64TextEdit.toPlainText()
         text_bytes = text.encode('utf-8')
+        mode = self.ui.b64comboBox.currentText()
         try:
-            result = base64.b64encode(text_bytes).decode()
+            result = b64method[mode][0](text_bytes).decode()
             self.ui.b64TextEdit.setPlainText(result)
         except Exception as err:
             self.statusBar().showMessage(repr(err), 5000)
