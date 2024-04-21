@@ -19,7 +19,7 @@ cryptography module for shadowsocks and hxsocks
 # 02110-1301  USA
 
 
-__version__ = '0.0.6'
+__version__ = '0.0.7'
 from hmac import compare_digest
 
 from cryptography.exceptions import InvalidSignature, InvalidTag
