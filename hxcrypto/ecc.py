@@ -35,6 +35,28 @@ from cryptography.hazmat.primitives.serialization import load_pem_private_key, \
     load_der_private_key, load_der_public_key, Encoding, PublicFormat, PrivateFormat, NoEncryption
 
 
+def exchange(peer_public_bytes: bytes, private_key: Optional[Union[EllipticCurvePrivateKey, X448PrivateKey, X25519PrivateKey]] = None) -> Tuple[bytes, bytes]:
+    peer_public_key = load_der_public_key(peer_public_bytes)
+    public: Union[EllipticCurvePublicKey, X448PublicKey, X25519PublicKey]
+    if isinstance(peer_public_key, EllipticCurvePublicKey):
+        curve = peer_public_key.curve
+        private = private_key if isinstance(private_key, EllipticCurvePrivateKey) else ec.generate_private_key(curve)
+        shared_secret = private.exchange(ec.ECDH(), peer_public_key)
+        public = private.public_key()
+        return public.public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo), shared_secret
+    if isinstance(peer_public_key, X448PublicKey):
+        private448 = private_key if isinstance(private_key, X448PrivateKey) else X448PrivateKey.generate()
+        shared_secret = private448.exchange(peer_public_key)
+        public = private448.public_key()
+        return public.public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo), shared_secret
+    if isinstance(peer_public_key, X25519PublicKey):
+        private25519 = private_key if isinstance(private_key, X25519PrivateKey) else X25519PrivateKey.generate()
+        shared_secret = private25519.exchange(peer_public_key)
+        public = private25519.public_key()
+        return public.public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo), shared_secret
+    raise ValueError(f'unknown public key <{peer_public_key.__class__.__name__}>')
+
+
 class Ecc:
     curve = {256: ec.SECP521R1(),
              192: ec.SECP384R1(),
@@ -100,28 +122,6 @@ class Ecc:
             self.ec_public.verify(signature, data, ec.ECDSA(getattr(hashes, hash_algo)()))
         else:
             self.ec_public.verify(signature, data)  # type: ignore[call-arg, union-attr]
-
-    @staticmethod
-    def exchange(peer_public_bytes: bytes, private_key: Optional[Union[EllipticCurvePrivateKey, X448PrivateKey, X25519PrivateKey]] = None) -> Tuple[bytes, bytes]:
-        peer_public_key = load_der_public_key(peer_public_bytes)
-        public: Union[EllipticCurvePublicKey, X448PublicKey, X25519PublicKey]
-        if isinstance(peer_public_key, EllipticCurvePublicKey):
-            curve = peer_public_key.curve
-            private = private_key if isinstance(private_key, EllipticCurvePrivateKey) else ec.generate_private_key(curve)
-            shared_secret = private.exchange(ec.ECDH(), peer_public_key)
-            public = private.public_key()
-            return public.public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo), shared_secret
-        if isinstance(peer_public_key, X448PublicKey):
-            private448 = private_key if isinstance(private_key, X448PrivateKey) else X448PrivateKey.generate()
-            shared_secret = private448.exchange(peer_public_key)
-            public = private448.public_key()
-            return public.public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo), shared_secret
-        if isinstance(peer_public_key, X25519PublicKey):
-            private25519 = private_key if isinstance(private_key, X25519PrivateKey) else X25519PrivateKey.generate()
-            shared_secret = private25519.exchange(peer_public_key)
-            public = private25519.public_key()
-            return public.public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo), shared_secret
-        raise ValueError(f'unknown public key <{peer_public_key.__class__.__name__}>')
 
     @staticmethod
     def b64u_to_hash(data: bytes) -> str:

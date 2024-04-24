@@ -27,7 +27,7 @@ from cryptography.exceptions import InvalidSignature, InvalidTag
 from .encrypt import BufEmptyError, is_aead, Encryptor, AEncryptor, IVError
 from .encrypt import SS_SUBKEY, SS_SUBKEY_2022
 from .encrypt import METHOD_SUPPORTED as method_supported
-from .ecc import Ecc
+from .ecc import Ecc, exchange
 ECC = Ecc
 
 __all__ = ['BufEmptyError',
@@ -39,6 +39,7 @@ __all__ = ['BufEmptyError',
            'IVError',
            'ECC',
            'Ecc',
+           'exchange',
            'compare_digest',
            'method_supported',
            'SS_SUBKEY',
