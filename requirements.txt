@@ -1,3 +1,2 @@
 cryptography >= 3.1
 dmfrbloom
-mmh3

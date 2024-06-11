@@ -10,8 +10,8 @@ setup(
     author_email='null',
     url='https://github.com/v3aqb/hxcrypto',
     packages=['hxcrypto'],
-    package_data={'hxcrypto': ['translate/*.qm']},
-    install_requires=["cryptography >= 3.1", "dmfrbloom", "mmh3"],
+    package_data={'hxcrypto': ['translate/*.qm', 'py.typed']},
+    install_requires=["cryptography >= 3.1", "dmfrbloom"],
     classifiers=[
         'License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)',
         'Programming Language :: Python :: 3.8',
