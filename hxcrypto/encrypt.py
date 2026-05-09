@@ -161,14 +161,14 @@ def is_aead(method_: str) -> bool:
     return METHOD_SUPPORTED[method_][2]
 
 
-class plain(CipherContext):
+class Plain(CipherContext):
     '''dummy stream cipher'''
     def __init__(self) -> None:
         pass
 
-    def update(self, buf: bytes) -> bytes:
+    def update(self, data: bytes) -> bytes:
         '''fake encrypt / decrypt'''
-        return buf
+        return data
 
     def update_into(self, data: bytes, buf: bytearray) -> int:  # type: ignore[override]
         buf[0:] = data
@@ -239,7 +239,7 @@ class Chacha20IETF(CipherContext):
 def get_cipher(key: bytes, method: str, op_: int, iv_: bytes) -> CipherContext:
     '''get stream cipher'''
     if method == 'none':
-        return plain()
+        return Plain()
     if method == 'rc4-md5':
         md5 = hashlib.md5()
         md5.update(key)
@@ -248,24 +248,24 @@ def get_cipher(key: bytes, method: str, op_: int, iv_: bytes) -> CipherContext:
         method = 'rc4'
     cipher = None
 
-    if method in ('rc4', 'chacha20-ietf'):
-        pass
-    elif method.endswith('ctr'):
-        mode = modes.CTR(iv_)
-    elif method.endswith('cfb'):
-        mode = modes.CFB(iv_)  # type: ignore[assignment]
-    elif method.endswith('ofb'):
-        mode = modes.OFB(iv_)  # type: ignore[assignment]
-    else:
-        raise ValueError(f'operation mode "{method.upper()}" not supported!')
+    def get_mode(method):
+        if method.endswith('ctr'):
+            return modes.CTR(iv_)
+        if method.endswith('cfb'):
+            return modes.CFB(iv_)
+        if method.endswith('ofb'):
+            return modes.OFB(iv_)
+        raise ValueError
 
     if method == 'rc4':
         cipher = Cipher(algorithms.ARC4(key), None)
     elif method == 'chacha20-ietf':
         return Chacha20IETF(method, key, iv_)
     elif method.startswith('aes'):
+        mode = get_mode(method)
         cipher = Cipher(algorithms.AES(key), mode)  # type: ignore[arg-type]
     elif method.startswith('camellia'):
+        mode = get_mode(method)
         cipher = Cipher(algorithms.Camellia(key), mode)  # type: ignore[arg-type]
     else:
         raise ValueError(f'crypto algorithm "{method.upper()}" not supported!')
@@ -333,12 +333,13 @@ class EncryptorStream:
 def Encryptor(password: str, method: str, check_iv=True, role=2):
     '''return shadowsocks Encryptor'''
     if is_aead(method):
-        subkey = SS_SUBKEY_2022 if method.startswith('2022') else SS_SUBKEY
-        if subkey == SS_SUBKEY:
+        if method.startswith('2022'):
+            subkey = SS_SUBKEY_2022
+            key = base64.b64decode(password.encode())
+        else:
+            subkey = SS_SUBKEY
             key_len = METHOD_SUPPORTED[method][0]
             key = EVP_BytesToKey(password, key_len)
-        elif subkey == SS_SUBKEY_2022:
-            key = base64.b64decode(password.encode())
         return AEncryptorAEAD(key, method, subkey, check_iv, role)
     key_len = METHOD_SUPPORTED[method][0]
     key = EVP_BytesToKey(password, key_len)
